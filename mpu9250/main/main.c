@@ -2,12 +2,13 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-02-28 18:53:28
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-02-29 10:36:28
+ * @LastEditTime: 2024-02-29 15:02:34
  * @FilePath: \esp32_pdr\mpu9250\main\main.c
  * 驱动mpu9250，串口输出欧拉角，可用上位机进行串口连接查看图像
  * 利用官方dmp库输出欧拉角
  * 使用I2C连接
  * 引脚使用：INT 23 SCL 22  SDA 21 供电3.3v
+ * 采样率设置：最快为200Hz(5ms采集一次)     文件mpu_dmp_driver.h   #define DEFAULT_MPU_HZ
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
  */

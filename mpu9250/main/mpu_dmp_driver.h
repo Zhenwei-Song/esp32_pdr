@@ -13,6 +13,7 @@
 #define MPU6500
 #define MPU_I2C_SCL 22
 #define MPU_I2C_SDA 21
+#define DEFAULT_MPU_HZ (100) // 设置MPU9250的采样率
 
 uint8_t mpu_init_i2c(void);
 

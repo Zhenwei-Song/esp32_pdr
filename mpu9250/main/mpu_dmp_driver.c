@@ -49,7 +49,6 @@
 #define NO_MOTION       (1)
 
 /* Starting sampling rate. */
-#define DEFAULT_MPU_HZ  (100) // 设置MPU6050的采样率
 
 #define FLASH_SIZE      (512)
 #define FLASH_MEM_START ((void*)0x1800)
