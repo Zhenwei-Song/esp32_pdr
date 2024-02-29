@@ -2,8 +2,8 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-02-28 18:53:28
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-02-29 09:44:07
- * @FilePath: \esp32\esp32_ble\oled_driver_test\main\oled_driver_test.c
+ * @LastEditTime: 2024-02-29 10:36:28
+ * @FilePath: \esp32_pdr\mpu9250\main\main.c
  * 驱动mpu9250，串口输出欧拉角，可用上位机进行串口连接查看图像
  * 利用官方dmp库输出欧拉角
  * 使用I2C连接
