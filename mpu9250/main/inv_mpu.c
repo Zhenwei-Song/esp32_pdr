@@ -769,13 +769,13 @@ int mpu_init(void)
 
     if (mpu_set_gyro_fsr(2000))
         return -3;
-    if (mpu_set_accel_fsr(2))
+    if (mpu_set_accel_fsr(16))
         return -4;
     if (mpu_set_lpf(42))
         return -5;
     if (mpu_set_sample_rate(50))
         return -6;
-    if (mpu_configure_fifo(0))
+    if (mpu_configure_fifo(INV_XYZ_ACCEL))
         return -7;
 
         // if (int_param)

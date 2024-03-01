@@ -5,11 +5,11 @@
  *   @{
  *       @file      motion_driver_test.c
  */
-#include <stdio.h>
+#include <math.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 
 // #include "USB_eMPL/descriptors.h"
 
@@ -38,20 +38,24 @@
 #include "inv_mpu_dmp_motion_driver.h"
 
 /* Data requested by client. */
-#define PRINT_ACCEL     (0x01)
-#define PRINT_GYRO      (0x02)
-#define PRINT_QUAT      (0x04)
+#define PRINT_ACCEL (0x01)
+#define PRINT_GYRO (0x02)
+#define PRINT_QUAT (0x04)
 
-#define ACCEL_ON        (0x01)
-#define GYRO_ON         (0x02)
+#define ACCEL_ON (0x01)
+#define GYRO_ON (0x02)
 
-#define MOTION          (0)
-#define NO_MOTION       (1)
+#define MOTION (0)
+#define NO_MOTION (1)
+
+#define MPU9250_ADDR 0X68        // MPU6500的器件IIC地址
+#define MPU_ACCEL_XOUTH_REG 0X3B // 加速度值,X轴高8位寄存器
+#define MPU_GYRO_XOUTH_REG 0X43  // 陀螺仪值,X轴高8位寄存器
 
 /* Starting sampling rate. */
 
-#define FLASH_SIZE      (512)
-#define FLASH_MEM_START ((void*)0x1800)
+#define FLASH_SIZE (512)
+#define FLASH_MEM_START ((void *)0x1800)
 
 struct rx_s {
     unsigned char header[3];
@@ -82,8 +86,8 @@ volatile unsigned char rx_new;
  * chip-to-body matrix for your particular set up.
  */
 static signed char gyro_orientation[9] = {-1, 0, 0,
-                                           0,-1, 0,
-                                           0, 0, 1};
+                                          0, -1, 0,
+                                          0, 0, 1};
 
 // enum packet_type_e {
 //     PACKET_TYPE_ACCEL,
@@ -187,7 +191,7 @@ static inline unsigned short inv_row_2_scale(const signed char *row)
     else if (row[2] < 0)
         b = 6;
     else
-        b = 7;      // error
+        b = 7; // error
     return b;
 }
 
@@ -208,7 +212,6 @@ static inline unsigned short inv_orientation_matrix_to_scalar(
     scalar = inv_row_2_scale(mtx);
     scalar |= inv_row_2_scale(mtx + 3) << 3;
     scalar |= inv_row_2_scale(mtx + 6) << 6;
-
 
     return scalar;
 }
@@ -244,18 +247,16 @@ static inline unsigned short inv_orientation_matrix_to_scalar(
 //     send_packet(PACKET_TYPE_ANDROID_ORIENT, &orientation);
 // }
 
-
 // static inline void msp430_reset(void)
 // {
 //     PMMCTL0 |= PMMSWPOR;
 // }
 
-// 重启系统  
+// 重启系统
 void system_reset(void)
 {
     esp_restart();
 }
-
 
 static inline void run_self_test(void)
 {
@@ -264,27 +265,27 @@ static inline void run_self_test(void)
     long gyro[3], accel[3];
     unsigned char i = 0;
 
-#if defined (MPU6500) || defined (MPU9250)
+#if defined(MPU6500) || defined(MPU9250)
     result = mpu_run_6500_self_test(gyro, accel, 0);
-#elif defined (MPU6050) || defined (MPU9150)
+#elif defined(MPU6050) || defined(MPU9150)
     result = mpu_run_self_test(gyro, accel);
 #endif
-    if (result == 0x3) { //六轴不是九轴
+    if (result == 0x3) { // 六轴不是九轴
         /* Test passed. We can trust the gyro data here, so let's push it down
          * to the DMP.
          */
-        for(i = 0; i<3; i++) {
-        	gyro[i] = (long)(gyro[i] * 32.8f); //convert to +-1000dps
-        	accel[i] *= 2048.f; //convert to +-16G
-        	accel[i] = accel[i] >> 16;
-        	gyro[i] = (long)(gyro[i] >> 16);
+        for (i = 0; i < 3; i++) {
+            gyro[i] = (long)(gyro[i] * 32.8f); // convert to +-1000dps
+            accel[i] *= 2048.f;                // convert to +-16G
+            accel[i] = accel[i] >> 16;
+            gyro[i] = (long)(gyro[i] >> 16);
         }
 
         mpu_set_gyro_bias_reg(gyro);
 
-#if defined (MPU6500) || defined (MPU9250)
+#if defined(MPU6500) || defined(MPU9250)
         mpu_set_accel_bias_6500_reg(accel);
-#elif defined (MPU6050) || defined (MPU9150)
+#elif defined(MPU6050) || defined(MPU9150)
         mpu_set_accel_bias_6050_reg(accel);
 #endif
     }
@@ -454,7 +455,7 @@ static inline void run_self_test(void)
 //         /* Test the motion interrupt hardware feature. */
 // 		#ifndef MPU6050 // not enabled for 6050 product
 // 		hal.motion_int_mode = 1;
-// 		#endif 
+// 		#endif
 //         break;
 //     case 'p':
 //         /* Read current pedometer count. */
@@ -509,18 +510,16 @@ void gyro_data_ready_cb(void)
 //     }
 // }
 
-
-
 uint8_t mpu_init_i2c(void)
 {
     esp_err_t esp_err;
     static i2c_config_t conf = {
         .mode = I2C_MODE_MASTER,
-        .sda_io_num = MPU_I2C_SDA,         // select GPIO specific to your project
+        .sda_io_num = MPU_I2C_SDA, // select GPIO specific to your project
         .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_io_num = MPU_I2C_SCL,         // select GPIO specific to your project
+        .scl_io_num = MPU_I2C_SCL, // select GPIO specific to your project
         .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = 200000,  // select frequency specific to your project
+        .master.clk_speed = 200000, // select frequency specific to your project
         // .clk_flags = 0,          /*!< Optional, you can use I2C_SCLK_SRC_FLAG_* flags to choose i2c source clock here. */
     };
     esp_err = i2c_param_config(0, &conf);
@@ -531,7 +530,6 @@ uint8_t mpu_init_i2c(void)
 
     return esp_err;
 }
-
 
 // 初始化mpu6050
 uint8_t mpu_dmp_init(void)
@@ -554,13 +552,13 @@ uint8_t mpu_dmp_init(void)
     // int_param.cb = gyro_data_ready_cb;
     // int_param.pin = INT_PIN_P20;
     // int_param.lp_exit = INT_EXIT_LPM0;
-    // int_param.active_low = 1;  
+    // int_param.active_low = 1;
 
     // result = mpu_init(&int_param);
-    result = mpu_init(); 
+    result = mpu_init();
     printf("mpu_init: %d\n", result);
 
-    if (result){
+    if (result) {
         // msp430_reset();
         system_reset();
         return 1;
@@ -572,18 +570,15 @@ uint8_t mpu_dmp_init(void)
 
     /* Get/set hardware configuration. Start gyro. */
     /* Wake up all sensors. */
-    if(mpu_set_sensors(INV_XYZ_GYRO | INV_XYZ_ACCEL))
-    {
+    if (mpu_set_sensors(INV_XYZ_GYRO | INV_XYZ_ACCEL)) {
         return 2;
     }
 
     /* Push both gyro and accel data into the FIFO. */
-    if (mpu_configure_fifo(INV_XYZ_GYRO | INV_XYZ_ACCEL))
-    {
+    if (mpu_configure_fifo(INV_XYZ_GYRO | INV_XYZ_ACCEL)) {
         return 3;
     }
-    if (mpu_set_sample_rate(DEFAULT_MPU_HZ))
-    {
+    if (mpu_set_sample_rate(DEFAULT_MPU_HZ)) {
         return 4;
     }
     /* Read back configuration in case it was set improperly. */
@@ -626,12 +621,10 @@ uint8_t mpu_dmp_init(void)
      * DMP_FEATURE_SEND_CAL_GYRO: Add calibrated gyro data to the FIFO. Cannot
      * be used in combination with DMP_FEATURE_SEND_RAW_GYRO.
      */
-    if (dmp_load_motion_driver_firmware())
-    {
+    if (dmp_load_motion_driver_firmware()) {
         return 5;
     }
-    if (dmp_set_orientation(inv_orientation_matrix_to_scalar(gyro_orientation)))
-    {
+    if (dmp_set_orientation(inv_orientation_matrix_to_scalar(gyro_orientation))) {
         return 6;
     }
     // dmp_register_tap_cb(tap_cb);
@@ -648,14 +641,12 @@ uint8_t mpu_dmp_init(void)
      * is set at a different rate. To avoid this issue include the DMP_FEATURE_TAP
      */
     hal.dmp_features = DMP_FEATURE_6X_LP_QUAT | DMP_FEATURE_TAP |
-        DMP_FEATURE_ANDROID_ORIENT | DMP_FEATURE_SEND_RAW_ACCEL | DMP_FEATURE_SEND_CAL_GYRO |
-        DMP_FEATURE_GYRO_CAL;
-    if (dmp_enable_feature(hal.dmp_features))
-    {
+                       DMP_FEATURE_ANDROID_ORIENT | DMP_FEATURE_SEND_RAW_ACCEL | DMP_FEATURE_SEND_CAL_GYRO |
+                       DMP_FEATURE_GYRO_CAL;
+    if (dmp_enable_feature(hal.dmp_features)) {
         return 7;
     }
-    if (dmp_set_fifo_rate(DEFAULT_MPU_HZ))
-    {
+    if (dmp_set_fifo_rate(DEFAULT_MPU_HZ)) {
         return 8;
     }
     mpu_set_dmp_state(1);
@@ -668,21 +659,56 @@ uint8_t mpu_dmp_init(void)
     // while (USB_connectionState() != ST_ENUM_ACTIVE);
 }
 
+// 得到加速度值(原始值)
+// gx,gy,gz:陀螺仪x,y,z轴的原始读数(带符号)
+// 返回值:0,成功
+//     其他,错误代码
+uint8_t MPU_Get_Accelerometer(short *ax, short *ay, short *az)
+{
+    uint8_t buf[6];
+    uint8_t res;
+    res = esp32_i2c_read(MPU9250_ADDR, MPU_ACCEL_XOUTH_REG, 6, buf);
+    if (res == 0) {
+        *ax = ((uint16_t)buf[0] << 8) | buf[1];
+        *ay = ((uint16_t)buf[2] << 8) | buf[3];
+        *az = ((uint16_t)buf[4] << 8) | buf[5];
+    }
+    return res;
+}
 
-
-
+// 得到陀螺仪值(原始值)
+// gx,gy,gz:陀螺仪x,y,z轴的原始读数(带符号)
+// 返回值:0,成功
+//     其他,错误代码
+uint8_t MPU_Get_Gyroscope(short *gx, short *gy, short *gz)
+{
+    uint8_t buf[6], res;
+    res = esp32_i2c_read(MPU9250_ADDR, MPU_GYRO_XOUTH_REG, 6, buf);
+    if (res == 0) {
+        *gx = ((uint16_t)buf[0] << 8) | buf[1];
+        *gy = ((uint16_t)buf[2] << 8) | buf[3];
+        *gz = ((uint16_t)buf[4] << 8) | buf[5];
+    }
+    return res;
+    ;
+}
 
 unsigned long sensor_timestamp;
 short gyro[3], accel[3], sensors;
+short aacx, aacy, aacz;
+short gyrox, gyroy, gyroz; // 陀螺仪原始数据
 unsigned char more;
-long quat[4]; 
-
+long quat[4];
+float norm;
 
 #define q30 1073741824.0f
 float q0 = 1.0f, q1 = 0.0f, q2 = 0.0f, q3 = 0.0f;
 float pitch, roll, yaw;
+float acc_pitch, acc_roll, acc_yaw;
+float Gx, Gy, Gz;
+float ax, ay, az;
 
-// 获取数据，给外部调用 
+// 获取数据，给外部调用
 uint8_t dmp_get_data(void)
 {
     // printf("dmp_get_data\n");
@@ -717,82 +743,111 @@ uint8_t dmp_get_data(void)
     if (hal.new_gyro && hal.dmp_on) {
         // printf("hal.new_gyro && hal.dmp_on\n");
         /* This function gets new data from the FIFO when the DMP is in
-            * use. The FIFO can contain any combination of gyro, accel,
-            * quaternion, and gesture data. The sensors parameter tells the
-            * caller which data fields were actually populated with new data.
-            * For example, if sensors == (INV_XYZ_GYRO | INV_WXYZ_QUAT), then
-            * the FIFO isn't being filled with accel data.
-            * The driver parses the gesture data to determine if a gesture
-            * event has occurred; on an event, the application will be notified
-            * via a callback (assuming that a callback function was properly
-            * registered). The more parameter is non-zero if there are
-            * leftover packets in the FIFO.
-            */
-        if (dmp_read_fifo(gyro, accel, quat, &sensor_timestamp, &sensors, &more))
-        {
+         * use. The FIFO can contain any combination of gyro, accel,
+         * quaternion, and gesture data. The sensors parameter tells the
+         * caller which data fields were actually populated with new data.
+         * For example, if sensors == (INV_XYZ_GYRO | INV_WXYZ_QUAT), then
+         * the FIFO isn't being filled with accel data.
+         * The driver parses the gesture data to determine if a gesture
+         * event has occurred; on an event, the application will be notified
+         * via a callback (assuming that a callback function was properly
+         * registered). The more parameter is non-zero if there are
+         * leftover packets in the FIFO.
+         */
+        if (dmp_read_fifo(gyro, accel, quat, &sensor_timestamp, &sensors, &more)) {
             return 1;
         }
         if (!more)
             hal.new_gyro = 0;
-        
-        if (sensors & INV_WXYZ_QUAT)
-        {
+
+        if (sensors & INV_WXYZ_QUAT) {
             q0 = quat[0] / q30;
             q1 = quat[1] / q30;
             q2 = quat[2] / q30;
             q3 = quat[3] / q30;
 
             pitch = asin(-2 * q1 * q3 + 2 * q0 * q2) * 57.3;
-            roll  = atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2 * q2 + 1)*57.3;
-            yaw   = atan2(2 * (q1 * q2 + q0 * q3), q0 * q0 + q1 * q1 - q2 * q2 -q3 * q3)*57.3;
+            roll = atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2 * q2 + 1) * 57.3;
+            yaw = atan2(2 * (q1 * q2 + q0 * q3), q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3) * 57.3;
             printf("pitch:%f,roll:%f,yaw:%f\n", pitch, roll, yaw);
-            // printf("pitch: %f\t", pitch);
-            // printf("roll: %f\t", roll);
-            // printf("yaw: %f\n", yaw);
 
+            // normalise the measurements
+            // norm = sqrt(aacx * aacx + aacy * aacy + aacz * aacz);
+            // ax = (float)aacx / norm;
+            // ay = (float)aacy / norm;
+            // az = (float)aacz / norm;
+            // printf("ax:%f,ay:%f,az:%f\n", ax, ay, az);
+
+            // acc_pitch = atan((float)aacx / (float)aacz) * 57.3;
+            // acc_roll = -atan((float)aacy / (float)aacz) * 57.3;
+            // acc_yaw = atan((float)aacx / (float)aacy) * 57.3;
+            // printf("acc_pitch:%f,acc_roll:%f,acc_yaw:%f\n", acc_pitch, acc_roll, acc_yaw);
+            // printf("quat[0]:%ld,quat[1]:%ld,quat[2]:%ld,quat[3]:%ld\n", quat[0], quat[1], quat[2], quat[3]);
+            //  printf("pitch: %f\t", pitch);
+            //  printf("roll: %f\t", roll);
+            //  printf("yaw: %f\n", yaw);
+#if 0
+            MPU_Get_Accelerometer(&aacx, &aacy, &aacz); // 得到加速度传感器数据
+            MPU_Get_Gyroscope(&gyrox,&gyroy,&gyroz);	                         //得到陀螺仪数据
+            //printf("gyrox:%d,gyroy:%d,gyroz:%d\n", gyrox, gyroy, gyroz);
+            printf("aacx:%d,aacy:%d,aacz:%d\n", aacx, aacy, aacz);
+#endif
+        }
+        if (sensors & INV_XYZ_ACCEL) {
+            aacy = -accel[0];
+            aacx = accel[1];
+            aacz = accel[2];
+            // Gx = aacx / 16384;
+            // Gy = aacy / 16384;
+            // Gz = aacz / 16384;
+            Gx = (float)aacx / 2048; // 根据量程修改
+            Gy = (float)aacy / 2048;
+            Gz = (float)aacz / 2048;
+            ax = Gx * 9.8;
+            ay = Gy * 9.8;
+            az = Gz * 9.8;
+
+            // printf("aacx:%d,aacy:%d,aacz:%d\n", accel[0], accel[1], accel[2]);
+            // printf("aacx:%d,aacy:%d,aacz:%d\n", aacx, aacy, aacz);
+            // printf("Gx:%f,Gy:%f,Gz:%f\n", Gx, Gy, Gz);
+            printf("ax:%f,ay:%f,az:%f\n\n", ax, ay, az);
         }
 
         /* Gyro and accel data are written to the FIFO by the DMP in chip
-            * frame and hardware units. This behavior is convenient because it
-            * keeps the gyro and accel outputs of dmp_read_fifo and
-            * mpu_read_fifo consistent.
-            */
+         * frame and hardware units. This behavior is convenient because it
+         * keeps the gyro and accel outputs of dmp_read_fifo and
+         * mpu_read_fifo consistent.
+         */
         // if (sensors & INV_XYZ_GYRO && hal.report & PRINT_GYRO)
         //     send_packet(PACKET_TYPE_GYRO, gyro);
         // if (sensors & INV_XYZ_ACCEL && hal.report & PRINT_ACCEL)
         //     send_packet(PACKET_TYPE_ACCEL, accel);
         /* Unlike gyro and accel, quaternions are written to the FIFO in
-            * the body frame, q30. The orientation is set by the scalar passed
-            * to dmp_set_orientation during initialization.
-            */
+         * the body frame, q30. The orientation is set by the scalar passed
+         * to dmp_set_orientation during initialization.
+         */
         // if (sensors & INV_WXYZ_QUAT && hal.report & PRINT_QUAT)
         //     send_packet(PACKET_TYPE_QUAT, quat);
-    // } else if (hal.new_gyro) {
-    //     short gyro[3], accel[3];
-    //     unsigned char sensors, more;
-    //     /* This function gets new data from the FIFO. The FIFO can contain
-    //         * gyro, accel, both, or neither. The sensors parameter tells the
-    //         * caller which data fields were actually populated with new data.
-    //         * For example, if sensors == INV_XYZ_GYRO, then the FIFO isn't
-    //         * being filled with accel data. The more parameter is non-zero if
-    //         * there are leftover packets in the FIFO.
-    //         */
-    //     mpu_read_fifo(gyro, accel, &sensor_timestamp, &sensors, &more);
-    //     if (!more)
-    //         hal.new_gyro = 0;
-    //     if (sensors & INV_XYZ_GYRO && hal.report & PRINT_GYRO)
-    //         send_packet(PACKET_TYPE_GYRO, gyro);
-    //     if (sensors & INV_XYZ_ACCEL && hal.report & PRINT_ACCEL)
-    //         send_packet(PACKET_TYPE_ACCEL, accel);
-        
-        
-
-
+        // } else if (hal.new_gyro) {
+        //     short gyro[3], accel[3];
+        //     unsigned char sensors, more;
+        //     /* This function gets new data from the FIFO. The FIFO can contain
+        //         * gyro, accel, both, or neither. The sensors parameter tells the
+        //         * caller which data fields were actually populated with new data.
+        //         * For example, if sensors == INV_XYZ_GYRO, then the FIFO isn't
+        //         * being filled with accel data. The more parameter is non-zero if
+        //         * there are leftover packets in the FIFO.
+        //         */
+        //     mpu_read_fifo(gyro, accel, &sensor_timestamp, &sensors, &more);
+        //     if (!more)
+        //         hal.new_gyro = 0;
+        //     if (sensors & INV_XYZ_GYRO && hal.report & PRINT_GYRO)
+        //         send_packet(PACKET_TYPE_GYRO, gyro);
+        //     if (sensors & INV_XYZ_ACCEL && hal.report & PRINT_ACCEL)
+        //         send_packet(PACKET_TYPE_ACCEL, accel);
     }
     return 0;
 }
-
-
 
 // void main(void)
 // {
@@ -981,4 +1036,3 @@ uint8_t dmp_get_data(void)
 //         }
 //     }
 // }
-

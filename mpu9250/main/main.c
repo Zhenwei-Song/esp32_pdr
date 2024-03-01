@@ -9,6 +9,7 @@
  * 使用I2C连接
  * 引脚使用：INT 23 SCL 22  SDA 21 供电3.3v
  * 采样率设置：最快为200Hz(5ms采集一次)     文件mpu_dmp_driver.h   #define DEFAULT_MPU_HZ
+ * 加速度量程设置：2到16g   文件inv_mpu.c    mpu_set_accel_fsr(16)      注意：同步修改mpu_dmp_driver.c中换算部分
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
  */

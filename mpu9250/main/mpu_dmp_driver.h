@@ -2,8 +2,8 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-02-28 18:53:28
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-02-28 20:47:47
- * @FilePath: \esp32\esp32_ble\oled_driver_test\main\mpu_dmp_driver.h
+ * @LastEditTime: 2024-02-29 15:49:48
+ * @FilePath: \esp32_pdr\mpu9250\main\mpu_dmp_driver.h
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
  */
@@ -13,7 +13,7 @@
 #define MPU6500
 #define MPU_I2C_SCL 22
 #define MPU_I2C_SDA 21
-#define DEFAULT_MPU_HZ (100) // 设置MPU9250的采样率
+#define DEFAULT_MPU_HZ (10) // 设置MPU9250的采样率
 
 uint8_t mpu_init_i2c(void);
 
