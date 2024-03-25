@@ -18,11 +18,13 @@
  *                  MPU9250 (or MPU6500 w/ AK8963 on the auxiliary bus)
  */
 
-#define MOTION_DRIVER_TARGET_MSP430
-#define MPU9250
-
 #ifndef _INV_MPU_H_
 #define _INV_MPU_H_
+
+#define MOTION_DRIVER_TARGET_MSP430
+#define MPU9250
+//#define AK8963_SECONDARY
+//#define AK89xx_SECONDARY
 
 #define INV_X_GYRO      (0x40)
 #define INV_Y_GYRO      (0x20)
@@ -31,7 +33,7 @@
 #define INV_XYZ_ACCEL   (0x08)
 #define INV_XYZ_COMPASS (0x01)
 
-struct int_param_s {
+    struct int_param_s {
 #if defined EMPL_TARGET_MSP430 || defined MOTION_DRIVER_TARGET_MSP430
     void (*cb)(void);
     unsigned short pin;

@@ -1,0 +1,127 @@
+#define _CRT_SECURE_NO_WARNINGS
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
+#include "MyMatrix.h"
+#include "att2que.h"
+#include "que2att.h"
+#include "que2mat.h"
+#include "my_insupdate.h"
+
+//程序中出现一行代码前后均有“//”的代码为调试代码过程中使用的运行过程可忽略！！！//
+
+# define pi 3.1415926535897932384626433832795
+# define N 85
+# define M 9999
+
+//wm_e, wm_d, wm_u, vm_e, vm_d, vm_u, t_c
+struct imuFile
+{
+	double wm_e;	 
+	double wm_d;
+	double wm_u;			 
+	double vm_e; 
+	double vm_d; 
+	double vm_u; 
+	double t_c;	
+};
+
+int main()
+{
+	double deg2rad;
+	deg2rad = pi / 180;
+
+	Matrix vn, pos, qnb, wm, vm, avptq, avpt;
+	vn = Create_Matrix(3, 1);
+	pos = Create_Matrix(3, 1);
+	qnb = Create_Matrix(4, 1);
+	wm = Create_Matrix(3, 1);
+	vm = Create_Matrix(3, 1);
+	avptq = Create_Matrix(14, 1);
+	avpt = Create_Matrix(10, 1);
+	double att_data[3] = { 0, 0, 90 * deg2rad };
+	double vn_data[3] = { 0, 0, 0 };
+	double pos_data[3] = { 34 * deg2rad, 108 * deg2rad, 100 };
+	double qnb_data[4] = { 0 };
+	double ts = 0.01, nts = 0.0;
+	double wm_data[3] = { 0 };
+	double vm_data[3] = { 0 };
+
+	qnb = att2que(att_data);
+	SetData_Matrix(vn, vn_data);
+	SetData_Matrix(pos, pos_data);
+
+	//Show_Matrix_E(att, "att = ");//
+	//Show_Matrix(att, "vn = ");//
+	//Show_Matrix(pos, "pos = ");//
+	//Show_Matrix_E(qnb, "qnb = ");//
+
+	struct imuFile imu[M] = {0};//创建结构体 
+
+	FILE* fp = fopen("imu.txt", "r");// 打开文件，读文件
+	if (fp == NULL) {
+		fprintf(stderr, "文件打开失败.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	FILE* fpWrite = fopen("avpt.txt", "w");// 打开文件，写文件
+	if (fpWrite == NULL)
+	{
+		return 0;
+	}
+
+	char row[N];
+	int i = 0;
+	if (fgets(row, N, fp) != NULL) {
+		while (fgets(row, N, fp) != NULL) {
+			//printf("%s", row);//
+			sscanf(row,"%lf	%lf	%lf	%lf	%lf	%lf %lf", &imu[i].wm_e, &imu[i].wm_d, &imu[i].wm_u, &imu[i].vm_e, &imu[i].vm_d, &imu[i].vm_u, &imu[i].t_c);//把数据存入结构体数组 
+			//printf("%1.5e\t%1.5e\t%1.5e\t%1.5e\t%1.5e\t%.7lf\t%.2lf\n", imu[i].wm_e, imu[i].wm_d, imu[i].wm_u, imu[i].vm_e, imu[i].vm_d, imu[i].vm_u, imu[i].t_c);//
+			//printf("%.12f\n", imu[i].wm_e);//
+		
+			wm_data[0] = imu[i].wm_e;
+			wm_data[1] = imu[i].wm_d;
+			wm_data[2] = imu[i].wm_u;
+			vm_data[0] = imu[i].vm_e;
+			vm_data[1] = imu[i].vm_d;
+			vm_data[2] = imu[i].vm_u;
+			
+			SetData_Matrix(wm, wm_data);
+			SetData_Matrix(vm, vm_data);
+			//Show_Matrix_E(wm, "wm = ");//
+			//Show_Matrix_E(vm, "vm = ");//
+			//Show_Matrix_E(qnb, "qnb = ");//
+			//Show_Matrix_E(vn, "vn = ");//
+			//Show_Matrix_E(pos, "pos = ");//
+			nts = nts + ts;
+			avptq = my_insupdate(qnb, vn, pos, wm, vm, nts);
+			avpt = Cope_Matrix(avptq, 10, 1);
+
+			vn_data[0] = PickInMat(avptq, 4, 1);
+			vn_data[1] = PickInMat(avptq, 5, 1);
+			vn_data[2] = PickInMat(avptq, 6, 1);
+			pos_data[0] = PickInMat(avptq, 7, 1);
+			pos_data[1] = PickInMat(avptq, 8, 1);
+			pos_data[2] = PickInMat(avptq, 9, 1);
+			qnb_data[0] = PickInMat(avptq, 11, 1);
+			qnb_data[1] = PickInMat(avptq, 12, 1);
+			qnb_data[2] = PickInMat(avptq, 13, 1);
+			qnb_data[3] = PickInMat(avptq, 14, 1);
+
+			SetData_Matrix(vn, vn_data);
+			SetData_Matrix(pos, pos_data);
+			SetData_Matrix(qnb, qnb_data);
+			//Show_Matrix_E(qnb, "qnb = ");//
+			//Show_Matrix_E(vn, "vn = ");//
+			//Show_Matrix_E(pos, "pos = ");//
+
+			//Show_Matrix_E(Trans_Matrix(avptq), "avptq = ");//
+			ShowWrite_Matrix(Trans_Matrix(avptq), fpWrite);//打印并输出到文件 avptq = [att; vn; pos; nts; qnb]_14*1
+			i++;
+		}	
+	}
+	fclose(fp);
+	fclose(fpWrite);
+	return 0;
+}

@@ -1,0 +1,21 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"math.h": "c",
+			"pdr.h": "c",
+			"data_processing.h": "c",
+			"mpu_dmp_driver.h": "c",
+			"psins,h": "c",
+			"mpu9250_spi.h": "c",
+			"empl_driver.h": "c",
+			"range.h": "c",
+			"mpu9250_raw.h": "c",
+			"que2mat.h": "c"
+		}
+	}
+}

@@ -51,6 +51,11 @@
 #define MPU9250_ADDR 0X68        // MPU6500的器件IIC地址
 #define MPU_ACCEL_XOUTH_REG 0X3B // 加速度值,X轴高8位寄存器
 #define MPU_GYRO_XOUTH_REG 0X43  // 陀螺仪值,X轴高8位寄存器
+#define AK8963_ADDR 0X0C
+#define AK8963_ID 0X48
+//#define MAG_XOUT_L 0X03
+#define MAG_CNTL1 0X0A
+#define MAG_WIA 0x00
 
 /* Starting sampling rate. */
 
@@ -536,7 +541,7 @@ uint8_t mpu_dmp_init(void)
 {
     if (mpu_init_i2c() != 0)
         return 1;
-    int result;
+    int result = 0;
     // unsigned char accel_fsr;
     // unsigned short gyro_rate, gyro_fsr;
     // unsigned long timestamp;
@@ -693,6 +698,32 @@ uint8_t MPU_Get_Gyroscope(short *gx, short *gy, short *gz)
     ;
 }
 
+// 得到磁力计值(原始值)
+// mx,my,mz:磁力计x,y,z轴的原始读数(带符号)
+// 返回值:0,成功
+//     其他,错误代码
+uint8_t MPU_Get_Magnetometer(short *mx, short *my, short *mz)
+{
+    uint8_t buf[6], res;
+    uint8_t write[1];
+    write[0] = 0x11;
+    res = esp32_i2c_read(AK8963_ADDR, MAG_XOUT_L, 6, buf);
+    if (res != 0) {
+        printf("AK8963 read error\n");
+    }
+    if (res == 0) {
+        *mx = ((uint16_t)buf[1] << 8) | buf[0];
+        *my = ((uint16_t)buf[3] << 8) | buf[2];
+        *mz = ((uint16_t)buf[5] << 8) | buf[4];
+    }
+    res = esp32_i2c_write(AK8963_ADDR, MAG_CNTL1, 1, write); // AK8963每次读完以后都需要重新设置为单次测量模式
+    if (res != 0) {
+        printf("AK8963 write error\n");
+    }
+    esp32_delay_ms(1);
+    return res;
+}
+
 unsigned long sensor_timestamp;
 short gyro[3], accel[3], sensors;
 short aacx, aacy, aacz;
@@ -704,13 +735,100 @@ float norm;
 #define q30 1073741824.0f
 float q0 = 1.0f, q1 = 0.0f, q2 = 0.0f, q3 = 0.0f;
 float pitch, roll, yaw;
-float acc_pitch, acc_roll, acc_yaw;
+float pitch_deg, roll_deg, yaw_deg;
 float Gx, Gy, Gz;
 float ax, ay, az;
 
-// 获取数据，给外部调用
-uint8_t dmp_get_data(void)
+// 将角度转换为弧度
+float degrees_to_radians(float degrees)
 {
+    return degrees * M_PI / 180.0;
+}
+
+#ifdef GET_LINEAR_ACC_AND_G
+
+typedef struct {
+    float x;
+    float y;
+    float z;
+} vector3D;
+
+typedef struct {
+    float x;
+    float y;
+    float z;
+    float Gx;
+    float Gy;
+    float Gz;
+} vector3D_G;
+
+typedef struct {
+    float roll;
+    float pitch;
+    float yaw;
+} eulerAngles;
+
+vector3D linearAcc = {0, 0, 0};
+vector3D gravity = {0.0, 0.0, 9.8};
+eulerAngles angles = {0, 0, 0};
+
+// 计算旋转矩阵
+void calculate_rotation_matrix(eulerAngles angles, float rotationMatrix[3][3])
+{
+    float cosRoll = cos(degrees_to_radians(angles.roll));
+    float sinRoll = sin(degrees_to_radians(angles.roll));
+    float cosPitch = cos(degrees_to_radians(angles.pitch));
+    float sinPitch = sin(degrees_to_radians(angles.pitch));
+    float cosYaw = cos(degrees_to_radians(angles.yaw));
+    float sinYaw = sin(degrees_to_radians(angles.yaw));
+
+    rotationMatrix[0][0] = cosPitch * cosYaw;
+    rotationMatrix[0][1] = cosPitch * sinYaw;
+    rotationMatrix[0][2] = -sinPitch;
+
+    rotationMatrix[1][0] = sinRoll * sinPitch * cosYaw - cosRoll * sinYaw;
+    rotationMatrix[1][1] = sinRoll * sinPitch * sinYaw + cosRoll * cosYaw;
+    rotationMatrix[1][2] = sinRoll * cosPitch;
+
+    rotationMatrix[2][0] = cosRoll * sinPitch * cosYaw + sinRoll * sinYaw;
+    rotationMatrix[2][1] = cosRoll * sinPitch * sinYaw - sinRoll * cosYaw;
+    rotationMatrix[2][2] = cosRoll * cosPitch;
+}
+
+// 剔除重力加速度
+vector3D_G get_result(vector3D linearAcc, vector3D gravity, eulerAngles angles)
+{
+    float rotationMatrix[3][3];
+    calculate_rotation_matrix(angles, rotationMatrix);
+
+    // 将重力加速度旋转到局部坐标系
+    float localGravity[3];
+    localGravity[1] = rotationMatrix[0][0] * gravity.x + rotationMatrix[0][1] * gravity.y + rotationMatrix[0][2] * gravity.z;
+    localGravity[0] = rotationMatrix[1][0] * gravity.x + rotationMatrix[1][1] * gravity.y + rotationMatrix[1][2] * gravity.z;
+    localGravity[2] = rotationMatrix[2][0] * gravity.x + rotationMatrix[2][1] * gravity.y + rotationMatrix[2][2] * gravity.z;
+
+    // 剔除重力加速度
+    vector3D_G linearAccWithoutGravity;
+    linearAccWithoutGravity.Gy = localGravity[1];
+    linearAccWithoutGravity.Gx = localGravity[0];
+    linearAccWithoutGravity.Gz = localGravity[2];
+    linearAccWithoutGravity.x = linearAcc.x - localGravity[0];
+    linearAccWithoutGravity.y = linearAcc.y - localGravity[1];
+    linearAccWithoutGravity.z = linearAcc.z + localGravity[2];
+
+    return linearAccWithoutGravity;
+}
+#endif // GET_LINEAR_ACC_AND_G
+
+// 获取数据，给外部调用
+void dmp_get_data(ps_point point)
+{
+#ifdef GET_RAW_INFO
+    int res = 0;
+    short rax, ray, raz;
+    short rgx, rgy, rgz;
+    short rmx, rmy, rmz;
+#endif
     // printf("dmp_get_data\n");
     // unsigned long sensor_timestamp;
     // if (rx_new)
@@ -755,62 +873,96 @@ uint8_t dmp_get_data(void)
          * leftover packets in the FIFO.
          */
         if (dmp_read_fifo(gyro, accel, quat, &sensor_timestamp, &sensors, &more)) {
-            return 1;
+            // return 1;
+            printf("error reading FIFO\n");
         }
         if (!more)
             hal.new_gyro = 0;
-
+        printf("gyro_fifo:%d,%d,%d\n", gyro[0], gyro[1], gyro[2]);
+        printf("accel_fifo:%d,%d,%d\n", accel[0], accel[1], accel[2]);
+        for (int i = 0; i < 3; i++) {
+            point->gyr_fifo[i] = gyro[i];
+            point->acc_fifo[i] = accel[i];
+        }
         if (sensors & INV_WXYZ_QUAT) {
             q0 = quat[0] / q30;
             q1 = quat[1] / q30;
             q2 = quat[2] / q30;
             q3 = quat[3] / q30;
 
-            pitch = asin(-2 * q1 * q3 + 2 * q0 * q2) * 57.3;
-            roll = atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2 * q2 + 1) * 57.3;
-            yaw = atan2(2 * (q1 * q2 + q0 * q3), q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3) * 57.3;
-            printf("pitch:%f,roll:%f,yaw:%f\n", pitch, roll, yaw);
-
-            // normalise the measurements
-            // norm = sqrt(aacx * aacx + aacy * aacy + aacz * aacz);
-            // ax = (float)aacx / norm;
-            // ay = (float)aacy / norm;
-            // az = (float)aacz / norm;
-            // printf("ax:%f,ay:%f,az:%f\n", ax, ay, az);
-
-            // acc_pitch = atan((float)aacx / (float)aacz) * 57.3;
-            // acc_roll = -atan((float)aacy / (float)aacz) * 57.3;
-            // acc_yaw = atan((float)aacx / (float)aacy) * 57.3;
-            // printf("acc_pitch:%f,acc_roll:%f,acc_yaw:%f\n", acc_pitch, acc_roll, acc_yaw);
-            // printf("quat[0]:%ld,quat[1]:%ld,quat[2]:%ld,quat[3]:%ld\n", quat[0], quat[1], quat[2], quat[3]);
-            //  printf("pitch: %f\t", pitch);
-            //  printf("roll: %f\t", roll);
-            //  printf("yaw: %f\n", yaw);
-#if 0
-            MPU_Get_Accelerometer(&aacx, &aacy, &aacz); // 得到加速度传感器数据
-            MPU_Get_Gyroscope(&gyrox,&gyroy,&gyroz);	                         //得到陀螺仪数据
-            //printf("gyrox:%d,gyroy:%d,gyroz:%d\n", gyrox, gyroy, gyroz);
-            printf("aacx:%d,aacy:%d,aacz:%d\n", aacx, aacy, aacz);
-#endif
+            point->q[0] = q0;
+            point->q[1] = q1;
+            point->q[2] = q2;
+            point->q[3] = q3;
+            // printf("q0:%f,q1:%f,q2:%f,q3:%f\n", point->q[0], point->q[1], point->q[2], point->q[3]);
+            //  pitch = asin(-2 * q1 * q3 + 2 * q0 * q2) * 57.3;
+            //  roll = atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2 * q2 + 1) * 57.3;
+            //  yaw = atan2(2 * (q1 * q2 + q0 * q3), q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3) * 57.3;
+            roll = -atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2 * q2 + 1);
+            pitch = -asin(2 * q0 * q2 - 2 * q1 * q3);
+            yaw = atan2(2 * (q1 * q2 + q0 * q3), 1 - 2 * q2 * q2 - 2 * q3 * q3);
+            pitch_deg = pitch * 57.29578;
+            roll_deg = roll * 57.29578;
+            yaw_deg = yaw * 57.29578;
+            point->gyr[0] = roll;
+            point->gyr[1] = pitch;
+            point->gyr[2] = yaw;
+            printf("pitch_deg:%f,roll_deg:%f,yaw_deg:%f\n", pitch_deg, roll_deg, yaw_deg);
+#ifdef GET_LINEAR_ACC_AND_G
+            angles.pitch = pitch;
+            angles.roll = roll;
+            angles.yaw = yaw;
+#endif // GET_LINEAR_ACC_AND_G
         }
         if (sensors & INV_XYZ_ACCEL) {
-            aacy = -accel[0];
-            aacx = accel[1];
-            aacz = accel[2];
-            // Gx = aacx / 16384;
-            // Gy = aacy / 16384;
-            // Gz = aacz / 16384;
-            Gx = (float)aacx / 2048; // 根据量程修改
-            Gy = (float)aacy / 2048;
-            Gz = (float)aacz / 2048;
+            aacx = -accel[0];
+            aacy = -accel[1];
+            aacz = -accel[2];
+
+            Gx = (float)aacx / A_RANGE_NUM;
+            Gy = (float)aacy / A_RANGE_NUM;
+            Gz = (float)aacz / A_RANGE_NUM;
+
             ax = Gx * 9.8;
             ay = Gy * 9.8;
             az = Gz * 9.8;
+            point->acc[0] = ax;
+            point->acc[1] = ay;
+            point->acc[2] = az;
+            printf("acceleration with G: ax:%f,ay:%f,az:%f\n", ax, ay, az);
+#ifdef GET_LINEAR_ACC_AND_G
+            vector3D linearAcc;
+            linearAcc.x = ax;
+            linearAcc.y = ay;
+            linearAcc.z = az;
+            vector3D_G acc_result = get_result(linearAcc, gravity, angles);
+            point->linear_acc[0] = acc_result.x;
+            point->linear_acc[1] = acc_result.y;
+            point->linear_acc[2] = acc_result.z;
+            printf("acceleration without G: %f, %f, %f\n", acc_result.x, acc_result.y, acc_result.z);
+            // printf("Gravity Acceleration: (%f, %f, %f)\n", acc_result.Gx, acc_result.Gy, acc_result.Gz);
+#endif // GET_LINEAR_ACC_AND_G
 
-            // printf("aacx:%d,aacy:%d,aacz:%d\n", accel[0], accel[1], accel[2]);
-            // printf("aacx:%d,aacy:%d,aacz:%d\n", aacx, aacy, aacz);
-            // printf("Gx:%f,Gy:%f,Gz:%f\n", Gx, Gy, Gz);
-            printf("ax:%f,ay:%f,az:%f\n\n", ax, ay, az);
+#ifdef GET_RAW_INFO
+            res = MPU_Get_Accelerometer(&rax, &ray, &raz);
+            if (res != 0)
+                printf("Error getting raw accelerometer\n");
+            printf("raw acc:%d, %d, %d\n", rax, ray, raz);
+            res = MPU_Get_Gyroscope(&rgx, &rgy, &rgz);
+            if (res != 0)
+                printf("Error getting raw gyro\n");
+            printf("raw gyro:%d, %d, %d\n", rgx, rgy, rgz);
+            res = MPU_Get_Magnetometer(&rmx, &rmy, &rmz);
+            if (res != 0)
+                printf("Error getting raw magnet\n");
+            printf("raw magnet:%d, %d, %d\n", rmx, rmy, rmz);
+            point->acc_raw[0] = rax;
+            point->acc_raw[1] = ray;
+            point->acc_raw[2] = raz;
+            point->gyr_raw[0] = rgx;
+            point->gyr_raw[1] = rgy;
+            point->gyr_raw[2] = rgz;
+#endif // GET_RAW_INFO
         }
 
         /* Gyro and accel data are written to the FIFO by the DMP in chip
@@ -846,7 +998,6 @@ uint8_t dmp_get_data(void)
         //     if (sensors & INV_XYZ_ACCEL && hal.report & PRINT_ACCEL)
         //         send_packet(PACKET_TYPE_ACCEL, accel);
     }
-    return 0;
 }
 
 // void main(void)

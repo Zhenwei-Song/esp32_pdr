@@ -24,6 +24,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "./../../../main/main.h"
+
+#define AK8963_ADDR 0X0C
+#define AK8963_ID 0X48
+#define MAG_XOUT_L 0X03
+#define MAG_CNTL1 0X0A
+#define MAG_WIA 0x00
+
 /* The following functions must be defined for this platform:
  * i2c_write(unsigned char slave_addr, unsigned char reg_addr,
  *      unsigned char length, unsigned char const *data)
@@ -720,12 +728,13 @@ int mpu_read_reg(unsigned char reg, unsigned char *data)
 // int mpu_init(struct int_param_s *int_param)
 int mpu_init(void)
 {
+    int res = 0;
     unsigned char data[6];
 
     /* Reset device. */
     data[0] = BIT_RESET;
     if (i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 1, data))
-        return -15;
+        return -1;
     delay_ms(100);
 
     /* Wake up chip. */
@@ -767,31 +776,67 @@ int mpu_init(void)
     st.chip_cfg.dmp_loaded = 0;
     st.chip_cfg.dmp_sample_rate = 0;
 
-    if (mpu_set_gyro_fsr(2000))
-        return -3;
-    if (mpu_set_accel_fsr(16))
-        return -4;
+    if (mpu_set_gyro_fsr(G_RANGE))
+        return -1;
+    if (mpu_set_accel_fsr(A_RANGE))
+        return -1;
     if (mpu_set_lpf(42))
-        return -5;
-    if (mpu_set_sample_rate(50))
-        return -6;
+        return -1;
+    if (mpu_set_sample_rate(SAMPLE_RATE))
+        return -1;
     if (mpu_configure_fifo(INV_XYZ_ACCEL))
-        return -7;
+        return -1;
 
         // if (int_param)
         //     reg_int_cb(int_param);
 
 #ifdef AK89xx_SECONDARY
-    setup_compass();
-    if (mpu_set_compass_sample_rate(10))
-        return -8;
+#if 0
+    res = setup_compass();
+    if(res != 0)
+    printf("Error setup_compass\n");
+    if (mpu_set_compass_sample_rate(SAMPLE_RATE))
+        printf("Error mpu_set_compass_sample_rate\n");
+    res = i2c_read(AK8963_ADDR, MAG_WIA, 1, data); // 读取AK8963 ID
+    if (res != 0) {
+        printf("AK8963 check ID read error\n");
+     }
+     if (data[0] == AK8963_ID) {
+         data[0] = 0X11;
+         i2c_write(AK8963_ADDR, MAG_CNTL1, 1, data);
+        printf("AK8963 check ID passed\n");
+     }
+    else{
+        printf("AK8963 check ID error\n");
+        //return 1;
+        }
+#else
+    data[0] = 0X82;
+    i2c_write(st.hw->addr, 0x37, 1, data);         // INT引脚低电平有效，开启bypass模式，可以直接读取磁力计
+    esp32_delay_ms(1);
+    res = i2c_read(AK8963_ADDR, MAG_WIA, 1, data); // 读取AK8963 ID
+    if (res != 0)
+        printf("AK8963 check ID read error\n");
+    if (data[0] == AK8963_ID) {
+        data[0] = 0X11;
+        res = i2c_write(AK8963_ADDR, MAG_CNTL1, 1, data);
+        if (res != 0)
+            printf("AK8963 init write error\n");
+        printf("AK8963 check ID passed\n");
+    }
+    else {
+        printf("AK8963 check ID error\n");
+        // return 1;
+    }
+    esp32_delay_ms(100);
+#endif
 #else
     /* Already disabled by setup_compass. */
     if (mpu_set_bypass(0))
         return -1;
 #endif
 
-    mpu_set_sensors(0);
+    mpu_set_sensors(INV_XYZ_GYRO | INV_XYZ_ACCEL | INV_XYZ_COMPASS);
     return 0;
 }
 
