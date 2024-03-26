@@ -907,7 +907,7 @@ void dmp_get_data(ps_point point)
             point->gyr[0] = roll;
             point->gyr[1] = pitch;
             point->gyr[2] = yaw;
-            printf("pitch_deg:%f,roll_deg:%f,yaw_deg:%f\n", pitch_deg, roll_deg, yaw_deg);
+            printf("roll_deg:%f,pitch_deg:%f,yaw_deg:%f\n", roll_deg, pitch_deg, yaw_deg);
 #ifdef GET_LINEAR_ACC_AND_G
             angles.pitch = pitch;
             angles.roll = roll;
@@ -952,10 +952,10 @@ void dmp_get_data(ps_point point)
             if (res != 0)
                 printf("Error getting raw gyro\n");
             printf("raw gyro:%d, %d, %d\n", rgx, rgy, rgz);
-            res = MPU_Get_Magnetometer(&rmx, &rmy, &rmz);
-            if (res != 0)
-                printf("Error getting raw magnet\n");
-            printf("raw magnet:%d, %d, %d\n", rmx, rmy, rmz);
+            // res = MPU_Get_Magnetometer(&rmx, &rmy, &rmz);
+            // if (res != 0)
+            //     printf("Error getting raw magnet\n");
+            // printf("raw magnet:%d, %d, %d\n", rmx, rmy, rmz);
             point->acc_raw[0] = rax;
             point->acc_raw[1] = ray;
             point->acc_raw[2] = raz;

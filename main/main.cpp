@@ -1,8 +1,17 @@
 /*
  * @Author: Zhenwei Song zhenwei.song@qq.com
+ * @Date: 2024-03-25 15:36:20
+ * @LastEditors: Zhenwei Song zhenwei.song@qq.com
+ * @LastEditTime: 2024-03-25 20:11:34
+ * @FilePath: \esp32_positioning\main\main.cpp
+ * @Description: 仅供学习交流使用
+ * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
+ */
+/*
+ * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-02-28 18:53:28
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-03-25 15:46:09
+ * @LastEditTime: 2024-03-25 18:26:34
  * @FilePath: \esp32_positioning\main\main.cpp
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
@@ -61,27 +70,16 @@
 
 extern "C" void app_main(void)
 {
-#ifdef ONLY_ATT
-    xCountingSemaphore_data_update = xSemaphoreCreateCounting(200, 0);
-#endif // ONLY_ATT
-#ifdef PSINS_POS
-    xCountingSemaphore_data_update_psins_pos = xSemaphoreCreateCounting(200, 0);
-#endif // PSINS_POS
-#ifdef USING_SFANN_SINS
-    xCountingSemaphore_data_update_sins_pos = xSemaphoreCreateCounting(200, 0);
-#endif // USING_SFANN_SINS
-
-#if defined USING_PSINS && defined USING_DMP
-    xCountingSemaphore_timeout2 = xSemaphoreCreateCounting(200, 0);
+#ifdef USING_DMP
     mpu_dmp_init();
     i2c_gpio_init();
     ins_init();
     gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
     start_i2c_isr();
     xTaskCreate(gpio_task, "gpio_task", 4096, NULL, 10, NULL);
-#endif // USING_PSINS && USING_DMP
+#endif // USING_DMP
 
-#if defined USING_PSINS && defined USING_RAW
+#ifdef USING_RAW
     uint8_t res = 0;
     mpu_init_i2c();
     res = RAW_MPU9250_Init();
@@ -93,20 +91,7 @@ extern "C" void app_main(void)
     printf("check point 0\n");
     xCountingSemaphore_timeout3 = xSemaphoreCreateCounting(200, 0);
     xTaskCreate(timer3_check_task, "timer3_check_task", 4096, NULL, 4, NULL);
-#endif // USING_PSINS && USING_RAW
-
-#ifdef USING_SFANN_SINS
-    uint8_t res = 0;
-    mpu_init_i2c();
-    res = RAW_MPU9250_Init();
-    if (res != 0) {
-        printf("raw_mPU9250_init() failed %d\n", res);
-    }
-    positioning_timer_init();
-    esp_timer_start_periodic(positioning_time3_timer, TIME3_TIMER_PERIOD);
-    xCountingSemaphore_timeout3 = xSemaphoreCreateCounting(200, 0);
-    xTaskCreate(timer3_check_task, "timer3_check_task", 4096, NULL, 4, NULL);
-#endif // USING_SFANN_SINS
+#endif // USING_RAW
 
 #ifdef USING_SPI
     xCountingSemaphore_timeout1 = xSemaphoreCreateCounting(200, 0);
@@ -114,15 +99,16 @@ extern "C" void app_main(void)
     xTaskCreate(timer1_check_task, "timer1_check_task", 4096, NULL, 4, NULL);
 #endif // USING_SPI
 
-#ifdef ONLY_ATT
+#ifdef PSINS_ATT
+    xCountingSemaphore_data_update = xSemaphoreCreateCounting(200, 0);
     xTaskCreate(data_update, "data_update", 4096, NULL, 4, NULL);
-#endif // ONLY_ATT
-#ifdef PSINS_POS
-    printf("check point1\n");
-    xTaskCreate(data_update_psins_pos, "data_update_psins_pos", 16384, NULL, 4, NULL);
-#endif // PSINS_POS
+#endif // PSINS_ATT
+#if defined PSINS_POS
+    xCountingSemaphore_data_update_static_psins_pos = xSemaphoreCreateCounting(200, 0);
+    xTaskCreate(data_update_static_psins_pos, "data_update_static_psins_pos", 16384, NULL, 4, NULL);
+#endif // PSINS_POS && USING_RAW
 #ifdef USING_SFANN_SINS
-    printf("check point1\n");
+    xCountingSemaphore_data_update_sins_pos = xSemaphoreCreateCounting(200, 0);
     xTaskCreate(data_update_sins_pos, "data_update_sins_pos", 4096, NULL, 4, NULL);
 #endif // USING_SFANN_SINS
 }

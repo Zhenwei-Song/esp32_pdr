@@ -2,7 +2,7 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-03-11 15:46:52
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-03-25 16:17:22
+ * @LastEditTime: 2024-03-26 09:12:47
  * @FilePath: \esp32_positioning\main\main.h
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
@@ -18,10 +18,13 @@
 /* -------------------------------------------------------------------------- */
 /*                                  数据读取方式设定                                  */
 /* -------------------------------------------------------------------------- */
-// #define USING_DMP//I2C读DMP
-#define USING_REG // I2C直接读寄存器
+#define USING_DMP // I2C读DMP
 
-#if defined USING_DMP || defined USING_REG
+#if !defined USING_DMP && !defined USING_RAW
+#define USING_RAW // 用直接读寄存器的方式
+#endif
+
+#if defined USING_DMP || defined USING_RAW
 #define USING_I2C
 #endif
 
@@ -34,7 +37,7 @@
 //  #define PSINS_ATT //仅获取姿态角
 #define PSINS_POS // 获取位置(包括姿态)
 
-// #define USING_SFANN_SINS // 用简化的捷联惯导定位
+ //#define USING_SFANN_SINS // 用简化的捷联惯导定位
 
 #ifdef USING_I2C
 
@@ -72,10 +75,6 @@
 
 #if !defined USING_PSINS && !defined USING_INS && !defined USING_SFANN_SINS
 #define USING_INS
-#endif
-
-#if !defined USING_DMP && !defined USING_RAW
-#define USING_RAW // 用直接读寄存器的方式
 #endif
 
 #ifdef USING_SPI

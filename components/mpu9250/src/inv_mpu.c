@@ -810,7 +810,7 @@ int mpu_init(void)
         printf("AK8963 check ID error\n");
         //return 1;
         }
-#else
+#elif 0
     data[0] = 0X82;
     i2c_write(st.hw->addr, 0x37, 1, data);         // INT引脚低电平有效，开启bypass模式，可以直接读取磁力计
     esp32_delay_ms(1);

@@ -82,7 +82,6 @@ void time1_timer_cb(void)
 }
 #endif // USING_SPI
 
-#ifdef USING_I2C
 #ifdef USING_DMP
 /**
  * @description: timer2超时函数，用于time2
@@ -109,7 +108,7 @@ void time3_timer_cb(void)
 {
     if (timer3_flag == false) {
         xSemaphoreGive(xCountingSemaphore_timeout3);
-        printf("time3_timeout\n");
+        //printf("time3_timeout\n");
 #ifdef DEBUG
         printf("time3_timeout\n");
 #endif
@@ -120,4 +119,3 @@ void time3_timer_cb(void)
     };
 }
 #endif // USING_RAW
-#endif // USING_I2C

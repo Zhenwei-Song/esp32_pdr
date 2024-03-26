@@ -48,7 +48,6 @@ void time1_timer_cb(void);
 
 #endif // USING_SPI
 
-#ifdef USING_I2C
 #ifdef USING_DMP
 extern bool timer2_flag;
 
@@ -73,7 +72,6 @@ extern SemaphoreHandle_t xCountingSemaphore_timeout3;
 
 void time3_timer_cb(void);
 #endif // USING_RAW
-#endif // USING_I2C
 
 void positioning_timer_init(void);
 

@@ -20,7 +20,7 @@ Date: 17/02/2015, 19/07/2017, 11/12/2018, 27/12/2019, 12/12/2020, 18/07/2021
 #pragma pack(4)
 
 /************** compiling control !!! ***************/
-#define PSINS_MATRIX_MAX_DIM 19
+#define PSINS_MATRIX_MAX_DIM 36
 // #define PSINS_IO_FILE
 // #define PSINS_RMEMORY
 #define PSINS_AHRS_MEMS
