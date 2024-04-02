@@ -2,7 +2,7 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-03-25 15:36:20
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-03-25 20:11:34
+ * @LastEditTime: 2024-03-28 11:52:36
  * @FilePath: \esp32_positioning\main\main.cpp
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
@@ -58,6 +58,7 @@
 #ifdef USING_PSINS
 #include "./../components/mpu9250/inc/mpu_dmp_driver.h"
 #include "./../components/psins/inc/mcu_init.h"
+#include "./../components/psins/inc/uart_out.h"
 #endif // USING_PSINS
 
 #ifdef USING_SFANN_SINS
@@ -71,6 +72,7 @@
 extern "C" void app_main(void)
 {
 #ifdef USING_DMP
+    positioning_timer_init();
     mpu_dmp_init();
     i2c_gpio_init();
     ins_init();
@@ -103,7 +105,12 @@ extern "C" void app_main(void)
     xCountingSemaphore_data_update = xSemaphoreCreateCounting(200, 0);
     xTaskCreate(data_update, "data_update", 4096, NULL, 4, NULL);
 #endif // PSINS_ATT
-#if defined PSINS_POS
+#ifdef PSINS_POS
+#ifdef PSINS_UART
+    xCountingSemaphore_timeout2 = xSemaphoreCreateCounting(200, 0);
+    xTaskCreate(timer2_check_task, "timer2_check_task", 4096, NULL, 4, NULL);
+    esp_timer_start_periodic(positioning_time2_timer, TIME2_TIMER_PERIOD);
+#endif // PSINS_UART
     xCountingSemaphore_data_update_static_psins_pos = xSemaphoreCreateCounting(200, 0);
     xTaskCreate(data_update_static_psins_pos, "data_update_static_psins_pos", 16384, NULL, 4, NULL);
 #endif // PSINS_POS && USING_RAW

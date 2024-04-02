@@ -5,6 +5,7 @@
 
 #include "./../components/mpu9250/inc/empl_driver.h"
 #include "./../components/mpu_timer/inc/positioning_timer.h"
+#include "./../components/my_uart/inc/my_uart.h"
 
 #ifdef USING_DMP
 #include "./../components/mpu9250/inc/mpu_dmp_driver.h"
@@ -23,6 +24,9 @@
 #include "./../components/mpu9250/inc/mpu_dmp_driver.h"
 #include "./../components/psins/inc/KFApp.h"
 #include "./../components/psins/inc/mcu_init.h"
+#ifdef PSINS_UART
+#include "./../components/psins/inc/uart_out.h"
+#endif
 #endif // USING_PSINS
 
 #ifdef USING_SFANN_SINS
@@ -264,51 +268,16 @@ void data_update(void *pvParameters)
 }
 #endif // PSINS_ATT
 
-#if defined PSINS_POS && defined USING_RAW
+#ifdef PSINS_POS
 void data_update_static_psins_pos(void *pvParameters)
 {
-#ifdef DEBUG
-    printf("check point4\n");
-    // CKFApp kf(my_TS);
-    printf("check point5\n");
-#endif
-    double yaw0 = C360CC180(100.0 * glv.deg); // 北偏东为正
-    CVect3 gpspos = LLH(LATITUDE, LONGITUDE, ALTITUDE);
-    kf.Init(CSINS(a2qua(CVect3(0, 0, yaw0)), O31, gpspos));       // 请正确初始化方位和位置
-    CVect3 eb = CVect3(0.880000, 1.524275, 125.895573) * glv.dps; // 陀螺零偏 deg/s
-    CVect3 db = CVect3(0.007036, 0.012188, 1.006611) * glv.g0;
-#ifdef DEBUG
-    printf("check point9\n");
-#endif
-    while (1) {
-#ifdef DEBUG
-        printf("check point22\n");
-#endif
-        if (xSemaphoreTake(xCountingSemaphore_data_update_static_psins_pos, portMAX_DELAY) == pdTRUE) {
-#ifdef DEBUG
-            printf("check point2\n");
-#endif
-            // kf.SetCalcuBurden(TIM2->CNT, 0);
-            kf.SetCalcuBurden(100, 0);
-            CVect3 wm = (*(CVect3 *)mpu_Data_value.Gyro * glv.dps - eb) * my_TS;
-            CVect3 vm = (*(CVect3 *)mpu_Data_value.Accel * glv.g0 - db) * my_TS;
-            kf.Update(&wm, &vm, 1, my_TS, 5);
-            AVPUartOut(kf);
-            timer3_flag = false;
-        }
-    }
-}
-#endif // PSINS_POS && defined USING_RAW
-
-#if defined PSINS_POS && defined USING_DMP
-void data_update_static_psins_pos(void *pvParameters)
-{
+    psins_uart_init();
     double yaw0 = C360CC180(0 * glv.deg); // 北偏东为正
     CVect3 gpspos = LLH(LATITUDE, LONGITUDE, ALTITUDE);
     kf.Init(CSINS(a2qua(CVect3(0, 0, yaw0)), O31, gpspos));       // 请正确初始化方位和位置
     CVect3 eb = CVect3(5.038168, 2.120916, 126.437557) * glv.dps; // 陀螺零偏 deg/s
-    CVect3 db = CVect3(0.0040283, 0.016958, 1.0010945) * glv.g0;
-    // CVect3 db = O31;
+    //CVect3 db = CVect3(0.0040283, 0.016958, 1.0010945) * glv.g0;
+     CVect3 db = O31;
     // CVect3 eb = O31;
     // static double sum_att[3] = {0};
     // static double sum_v[3] = {0};
@@ -323,7 +292,7 @@ void data_update_static_psins_pos(void *pvParameters)
     while (1) {
         if (xSemaphoreTake(xCountingSemaphore_data_update_static_psins_pos, portMAX_DELAY) == pdTRUE) {
             // kf.SetCalcuBurden(TIM2->CNT, 0);
-            //kf.SetCalcuBurden(100, 0);
+            // kf.SetCalcuBurden(100, 0);
             CVect3 wm = (*(CVect3 *)mpu_Data_value.Gyro * glv.dps - eb) * my_TS;
             CVect3 vm = (*(CVect3 *)mpu_Data_value.Accel * glv.g0 - db) * my_TS;
             // for (int i = 0; i < 3; i++) {
@@ -354,16 +323,43 @@ void data_update_static_psins_pos(void *pvParameters)
             //     printf("warning ave Accel:(%f,%f,%f)\n", ave_v[0], ave_v[1], ave_v[2]);
             //     printf("warning ave att:(%f,%f,%f)\n", ave_att[0], ave_att[1], ave_att[2]);
             // }
+            // Data_updata();
+            // psins_sendData_tx(TX_TAG, (const char *)Usart1_out_DATA,35*4);
             printf("mpu_AD_value.Accel:(%d,%d,%d)\n", mpu_AD_value.Accel[0], mpu_AD_value.Accel[1], mpu_AD_value.Accel[2]);
             printf("mpu_AD_value.Gyro:(%d,%d,%d)\n", mpu_AD_value.Gyro[0], mpu_AD_value.Gyro[1], mpu_AD_value.Gyro[2]);
             printf("mpu_Data_value.Accel:(%f,%f,%f)\n", mpu_Data_value.Accel[0], mpu_Data_value.Accel[1], mpu_Data_value.Accel[2]);
             printf("mpu_Data_value.Gyro:(%f,%f,%f)\n\n", mpu_Data_value.Gyro[0], mpu_Data_value.Gyro[1], mpu_Data_value.Gyro[2]);
             // printf("mpu_Data_value.Mag:(%f,%f,%f)\n", mpu_Data_value.Mag[0], mpu_Data_value.Mag[1], mpu_Data_value.Mag[2]);
+#ifdef USING_DMP
             data_updated = true;
+#endif
+#ifdef USING_RAW
+            timer3_flag = false;
+#endif
         }
     }
 }
 #endif // PSINS_POS && defined USING_DMP
+
+#ifdef PSINS_UART
+/**
+ * @description: 监听timer2超时，定时器2周期发送数据
+ * @param {void} *pvParameters
+ * @return {*}
+ */
+void timer2_check_task(void *pvParameters)
+{
+    while (1) {
+        if (xSemaphoreTake(xCountingSemaphore_timeout2, portMAX_DELAY) == pdTRUE) // 得到了信号量
+        {
+            Data_updata();
+            psins_sendData_tx(TX_TAG, (const char *)Usart1_out_DATA, 35 * 4);
+            timer2_flag = false;
+        }
+    }
+}
+
+#endif // PSINS_UART
 
 #ifdef USING_SFANN_SINS
 void data_update_sins_pos(void *pvParameters)

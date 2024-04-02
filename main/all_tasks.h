@@ -33,7 +33,10 @@ extern SemaphoreHandle_t xCountingSemaphore_data_update;
 void data_update(void *pvParameters);
 #endif // ONLY_ATT
 
-#if defined PSINS_POS
+#ifdef PSINS_POS
+#ifdef PSINS_UART
+void timer2_check_task(void *pvParameters);
+#endif
 extern SemaphoreHandle_t xCountingSemaphore_data_update_static_psins_pos;
 void data_update_static_psins_pos(void *pvParameters);
 #endif // PSINS_POS

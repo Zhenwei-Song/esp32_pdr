@@ -48,17 +48,17 @@ void time1_timer_cb(void);
 
 #endif // USING_SPI
 
-#ifdef USING_DMP
+#ifdef PSINS_UART
 extern bool timer2_flag;
 
 extern esp_timer_handle_t positioning_time2_timer;
 
 extern SemaphoreHandle_t xCountingSemaphore_timeout2;
 
-#define TIME2_TIMER_PERIOD 100000 // 100ms
+#define TIME2_TIMER_PERIOD (1 * 1000000 / DEFAULT_HZ)
 
 void time2_timer_cb(void);
-#endif // USING_DMP
+#endif // PSINS_UART
 #ifdef USING_RAW
 extern bool timer3_flag;
 

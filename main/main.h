@@ -2,7 +2,7 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-03-11 15:46:52
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-03-26 09:12:47
+ * @LastEditTime: 2024-03-29 16:42:22
  * @FilePath: \esp32_positioning\main\main.h
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
@@ -18,7 +18,7 @@
 /* -------------------------------------------------------------------------- */
 /*                                  数据读取方式设定                                  */
 /* -------------------------------------------------------------------------- */
-#define USING_DMP // I2C读DMP
+// #define USING_DMP // I2C读DMP
 
 #if !defined USING_DMP && !defined USING_RAW
 #define USING_RAW // 用直接读寄存器的方式
@@ -35,9 +35,10 @@
 /*                                  数据解析方式设定                                  */
 /* -------------------------------------------------------------------------- */
 //  #define PSINS_ATT //仅获取姿态角
-#define PSINS_POS // 获取位置(包括姿态)
+#define PSINS_POS  // 获取位置(包括姿态)
+#define PSINS_UART // 上传给上位机数据
 
- //#define USING_SFANN_SINS // 用简化的捷联惯导定位
+// #define USING_SFANN_SINS // 用简化的捷联惯导定位
 
 #ifdef USING_I2C
 
@@ -45,7 +46,7 @@
 #define I2C_SCL 22
 #define I2C_SDA 21
 #define GPIO_INTR 23
-#define DEFAULT_HZ (10)     // 设置MPU9250的采样率
+#define DEFAULT_HZ (50)     // 设置MPU9250的采样率
 #define A_RANGE A_RANGE_4   // 传感器加速度量程
 #define G_RANGE G_RANGE_500 // 传感器加速度量程
 

@@ -3,7 +3,7 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-01-16 15:05:32
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-03-21 17:09:57
+ * @LastEditTime: 2024-03-28 11:09:19
  * @FilePath: \esp32_positioning\components\mpu_timer\src\positioning_timer.c
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
@@ -19,13 +19,13 @@ SemaphoreHandle_t xCountingSemaphore_timeout1;
 #endif
 
 #ifdef USING_I2C
-#ifdef USING_DMP
+#ifdef PSINS_UART
 bool timer2_flag = false;
 
 esp_timer_handle_t positioning_time2_timer;
 
 SemaphoreHandle_t xCountingSemaphore_timeout2;
-#endif // USING_DMP
+#endif // PSINS_UART
 #ifdef USING_RAW
 bool timer3_flag = false;
 
@@ -48,12 +48,12 @@ void positioning_timer_init(void)
     ESP_ERROR_CHECK(esp_timer_create(&time1_timer_args, &positioning_time1_timer));
 #endif // USING_SPI
 #ifdef USING_I2C
-#ifdef USING_DMP
+#ifdef PSINS_UART
     const esp_timer_create_args_t time2_timer_args = {
         .callback = &time2_timer_cb,
         .name = "timer2"}; // 定时器名字
     ESP_ERROR_CHECK(esp_timer_create(&time2_timer_args, &positioning_time2_timer));
-#endif // USING_DMP
+#endif // PSINS_UART
 
 #ifdef USING_RAW
     const esp_timer_create_args_t time3_timer_args = {
@@ -82,7 +82,7 @@ void time1_timer_cb(void)
 }
 #endif // USING_SPI
 
-#ifdef USING_DMP
+#ifdef PSINS_UART
 /**
  * @description: timer2超时函数，用于time2
  * @return {*}
@@ -94,10 +94,14 @@ void time2_timer_cb(void)
 #ifdef DEBUG
         printf("time2_timeout\n");
 #endif
+        OUT_cnt = OUT_cnt + 1000 / DEFAULT_HZ;
         timer2_flag = true;
     }
+    else {
+        printf("\n\ntimer block warning\n\n");
+    }
 }
-#endif // USING_DMP
+#endif // PSINS_UART
 
 #ifdef USING_RAW
 /**
@@ -108,7 +112,7 @@ void time3_timer_cb(void)
 {
     if (timer3_flag == false) {
         xSemaphoreGive(xCountingSemaphore_timeout3);
-        //printf("time3_timeout\n");
+        // printf("time3_timeout\n");
 #ifdef DEBUG
         printf("time3_timeout\n");
 #endif
@@ -116,6 +120,6 @@ void time3_timer_cb(void)
     }
     else {
         printf("\n\ntimer block warning\n\n");
-    };
+    }
 }
 #endif // USING_RAW
