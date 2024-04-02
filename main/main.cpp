@@ -32,6 +32,7 @@
  * 陀螺仪量程设置：250到2000deg/s,使用500deg/s作为量程(使用SPI时默认量程)
  * 读取mpu9250数据可采用dmp（i2c，磁力无法读），直接读寄存器（i2c），直接读寄存器（spi，存在数据读不全，速度慢问题）
  * 姿态解析可采用DMP（无磁力信息）、PSINS中解析，以及简化版捷联惯导sfann_sins(未验证)
+ * psins可以使用串口上传数据，由电脑端运行psins进行解析
  *坐标广研院：23.305836,113.572256，59
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
