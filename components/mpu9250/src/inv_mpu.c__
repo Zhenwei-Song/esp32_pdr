@@ -180,7 +180,7 @@ struct gyro_reg_s {
     unsigned char fifo_en;
     unsigned char gyro_cfg;
     unsigned char accel_cfg;
-     unsigned char accel_cfg2;
+    // unsigned char accel_cfg2;
     // unsigned char lp_accel_odr;
     unsigned char motion_thr;
     unsigned char motion_dur;
@@ -712,6 +712,7 @@ int mpu_read_reg(unsigned char reg, unsigned char *data)
     return i2c_read(st.hw->addr, reg, 1, data);
 }
 
+
 #if 1
 #define AK8963_ADDRESS 0x0C
 #define AK8963_WHO_AM_I 0x00 // should return 0x48
@@ -733,33 +734,26 @@ int mpu_read_reg(unsigned char reg, unsigned char *data)
 
 void initAK8963_2(float *destination)
 {
-    int res;
     // First extract the factory calibration for each magnetometer axis
-    uint8_t rawData[3]; // x/y/z gyro calibration data stored here
-    // writeByte(AK8963_ADDRESS, AK8963_CNTL, 0x00); // Power down magnetometer
-    res = i2c_write(AK8963_ADDRESS, AK8963_CNTL, 1, 0x00);
-    if (res != 0) {
-        printf("Error initing AK8963  1");
-    }
+    uint8_t rawData[3];                           // x/y/z gyro calibration data stored here
+    //writeByte(AK8963_ADDRESS, AK8963_CNTL, 0x00); // Power down magnetometer
+    i2c_write(AK8963_ADDRESS, AK8963_CNTL,1, 0x00);
     delay_ms(10);
-    // writeByte(AK8963_ADDRESS, AK8963_CNTL, 0x0F); // Enter Fuse ROM access mode
-    res = i2c_write(AK8963_ADDRESS, AK8963_CNTL, 1, 0x0F);
-    if (res != 0) {
-        printf("Error initing AK8963  2");
-    }
+    //writeByte(AK8963_ADDRESS, AK8963_CNTL, 0x0F); // Enter Fuse ROM access mode
+    i2c_write(AK8963_ADDRESS, AK8963_CNTL, 1, 0x0F);
     delay_ms(10);
-    // readBytes(AK8963_ADDRESS, AK8963_ASAX, 3, &rawData[0]);  // Read the x-, y-, and z-axis calibration values
+    //readBytes(AK8963_ADDRESS, AK8963_ASAX, 3, &rawData[0]);  // Read the x-, y-, and z-axis calibration values
     i2c_read(AK8963_ADDRESS, AK8963_ASAX, 3, &rawData[0]);
     destination[0] = (float)(rawData[0] - 128) / 256.0 + 1.; // Return x-axis sensitivity adjustment values, etc.
     destination[1] = (float)(rawData[1] - 128) / 256.0 + 1.;
     destination[2] = (float)(rawData[2] - 128) / 256.0 + 1.;
-    // writeByte(AK8963_ADDRESS, AK8963_CNTL, 0x00); // Power down magnetometer
+    //writeByte(AK8963_ADDRESS, AK8963_CNTL, 0x00); // Power down magnetometer
     i2c_write(AK8963_ADDRESS, AK8963_CNTL, 1, 0x00);
     delay_ms(10);
     // Configure the magnetometer for continuous read and highest resolution
     // set Mscale bit 4 to 1 (0) to enable 16 (14) bit resolution in CNTL register,
     // and enable continuous mode data acquisition Mmode (bits [3:0]), 0010 for 8 Hz and 0110 for 100 Hz sample rates
-    // writeByte(AK8963_ADDRESS, AK8963_CNTL, 1 << 4 | 2); // Set magnetometer data resolution and sample ODR
+    //writeByte(AK8963_ADDRESS, AK8963_CNTL, 1 << 4 | 2); // Set magnetometer data resolution and sample ODR
     i2c_write(AK8963_ADDRESS, AK8963_CNTL, 1, 1 << 4 | 2);
     delay_ms(10);
 }
@@ -767,14 +761,14 @@ void initAK8963_2(float *destination)
 void readMagData(short *destination)
 {
     uint8_t tempData[1];
-    uint8_t rawData[7]; // x/y/z gyro register data, ST2 register stored here, must read ST2 at end of data acquisition
-    // if (readByte(AK8963_ADDRESS, AK8963_ST1) & 0x01) {                // wait for magnetometer data ready bit to be set
+    uint8_t rawData[7];                                               // x/y/z gyro register data, ST2 register stored here, must read ST2 at end of data acquisition
+    //if (readByte(AK8963_ADDRESS, AK8963_ST1) & 0x01) {                // wait for magnetometer data ready bit to be set
     i2c_read(AK8963_ADDRESS, AK8963_ST1, 1, &tempData[0]);
     if (tempData[0] & 0x01) {
         i2c_read(AK8963_ADDRESS, AK8963_XOUT_L, 7, &rawData[0]);
-        // readBytes(AK8963_ADDRESS, AK8963_XOUT_L, 7, &rawData[0]);     // Read the six raw data and ST2 registers sequentially into data array
-        uint8_t c = rawData[6];                                     // End data read by reading ST2 register
-        if (!(c & 0x08)) {                                          // Check if magnetic sensor overflow set, if not then report data
+        //readBytes(AK8963_ADDRESS, AK8963_XOUT_L, 7, &rawData[0]);     // Read the six raw data and ST2 registers sequentially into data array
+        uint8_t c = rawData[6];                                       // End data read by reading ST2 register
+        if (!(c & 0x08)) {                                            // Check if magnetic sensor overflow set, if not then report data
             destination[0] = ((short)rawData[1] << 8) | rawData[0]; // Turn the MSB and LSB into a signed 16-bit value
             destination[1] = ((short)rawData[3] << 8) | rawData[2]; // Data stored as little Endian
             destination[2] = ((short)rawData[5] << 8) | rawData[4];
@@ -819,9 +813,9 @@ int mpu_init(void)
     /* MPU6500 shares 4kB of memory between the DMP and the FIFO. Since the
      * first 3kB are needed by the DMP, we'll use the last 1kB for the FIFO.
      */
-    data[0] = BIT_FIFO_SIZE_1024 | 0x8;
-    if (i2c_write(st.hw->addr, st.reg->accel_cfg2, 1, data))
-        return -1;
+    data[0] = BIT_FIFO_SIZE_1024;
+    // if (i2c_write(st.hw->addr, st.reg->accel_cfg2, 1, data))
+    //     return -1;
 #endif
 
     /* Set to invalid values to ensure no I2C writes are skipped. */
@@ -855,7 +849,7 @@ int mpu_init(void)
         return -1;
     if (mpu_set_sample_rate(SAMPLE_RATE))
         return -1;
-    if (mpu_configure_fifo(0))
+    if (mpu_configure_fifo(INV_XYZ_ACCEL))
         return -1;
 
         // if (int_param)
@@ -883,7 +877,7 @@ int mpu_init(void)
         }
 #elif 0
     data[0] = 0X82;
-    i2c_write(st.hw->addr, 0x37, 1, data); // INT引脚低电平有效，开启bypass模式，可以直接读取磁力计
+    i2c_write(st.hw->addr, 0x37, 1, data);         // INT引脚低电平有效，开启bypass模式，可以直接读取磁力计
     esp32_delay_ms(1);
     res = i2c_read(AK8963_ADDR, MAG_WIA, 1, data); // 读取AK8963 ID
     if (res != 0)
@@ -900,11 +894,6 @@ int mpu_init(void)
         // return 1;
     }
     esp32_delay_ms(100);
-#elif 1
-    setup_compass();
-    printf("setup_compass\n");
-    if (mpu_set_compass_sample_rate(10))
-        return -10;
 #endif
 #else
     /* Already disabled by setup_compass. */
@@ -912,7 +901,7 @@ int mpu_init(void)
         return -1;
 #endif
 
-    mpu_set_sensors(0);
+    mpu_set_sensors(INV_XYZ_GYRO | INV_XYZ_ACCEL | INV_XYZ_COMPASS);
     return 0;
 }
 
@@ -2842,7 +2831,7 @@ restore:
     mpu_set_gyro_fsr(gyro_fsr);
     mpu_set_accel_fsr(accel_fsr);
     mpu_set_lpf(lpf);
-    mpu_set_sample_rate(SAMPLE_RATE);
+    mpu_set_sample_rate(sample_rate);
     mpu_set_sensors(sensors_on);
     mpu_configure_fifo(fifo_sensors);
 
@@ -2945,7 +2934,7 @@ restore:
     mpu_set_gyro_fsr(gyro_fsr);
     mpu_set_accel_fsr(accel_fsr);
     mpu_set_lpf(lpf);
-    mpu_set_sample_rate(SAMPLE_RATE);
+    mpu_set_sample_rate(sample_rate);
     mpu_set_sensors(sensors_on);
     mpu_configure_fifo(fifo_sensors);
 

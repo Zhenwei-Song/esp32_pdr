@@ -3,7 +3,7 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-01-16 15:05:32
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-03-28 11:09:19
+ * @LastEditTime: 2024-04-09 09:36:17
  * @FilePath: \esp32_positioning\components\mpu_timer\src\positioning_timer.c
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
@@ -21,6 +21,10 @@ SemaphoreHandle_t xCountingSemaphore_timeout1;
 #ifdef USING_I2C
 #ifdef PSINS_UART
 bool timer2_flag = false;
+
+esp_timer_handle_t positioning_time1_timer;
+
+SemaphoreHandle_t xCountingSemaphore_timeout1;
 
 esp_timer_handle_t positioning_time2_timer;
 
@@ -49,6 +53,10 @@ void positioning_timer_init(void)
 #endif // USING_SPI
 #ifdef USING_I2C
 #ifdef PSINS_UART
+    const esp_timer_create_args_t time1_timer_args = {
+        .callback = &time1_timer_cb,
+        .name = "timer1"}; // 定时器名字
+    ESP_ERROR_CHECK(esp_timer_create(&time1_timer_args, &positioning_time1_timer));
     const esp_timer_create_args_t time2_timer_args = {
         .callback = &time2_timer_cb,
         .name = "timer2"}; // 定时器名字
@@ -83,6 +91,11 @@ void time1_timer_cb(void)
 #endif // USING_SPI
 
 #ifdef PSINS_UART
+void time1_timer_cb(void)
+{
+    OUT_cnt = OUT_cnt + 1000 / DEFAULT_HZ;
+}
+
 /**
  * @description: timer2超时函数，用于time2
  * @return {*}
@@ -94,11 +107,11 @@ void time2_timer_cb(void)
 #ifdef DEBUG
         printf("time2_timeout\n");
 #endif
-        OUT_cnt = OUT_cnt + 1000 / DEFAULT_HZ;
+        // OUT_cnt = OUT_cnt + 1000 / DEFAULT_HZ;
         timer2_flag = true;
     }
     else {
-        printf("\n\ntimer block warning\n\n");
+        //printf("\n\ntimer 2 block warning\n\n");
     }
 }
 #endif // PSINS_UART
@@ -119,7 +132,7 @@ void time3_timer_cb(void)
         timer3_flag = true;
     }
     else {
-        printf("\n\ntimer block warning\n\n");
+        //printf("\n\ntimer 3 warning\n\n");
     }
 }
 #endif // USING_RAW

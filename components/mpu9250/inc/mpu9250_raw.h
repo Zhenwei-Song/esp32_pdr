@@ -10,6 +10,8 @@
 extern "C" {
 #endif
 
+extern short raw_gyr[3], raw_acc[3], raw_mag[3], raw_tem;
+
 //#include "sys.h"
 // 如果AD0脚(9脚)接地,IIC地址为0X68(不包含最低位).
 // 如果接V3.3,则IIC地址为0X69(不包含最低位).

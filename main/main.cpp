@@ -2,7 +2,7 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-03-25 15:36:20
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-03-28 11:52:36
+ * @LastEditTime: 2024-04-09 15:05:08
  * @FilePath: \esp32_positioning\main\main.cpp
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
@@ -44,6 +44,7 @@
 #include "./../components/mpu_timer/inc/positioning_timer.h"
 
 #ifdef USING_DMP
+#include "./../components/mpu9250/inc/inv_mpu.h"
 #include "./../components/mpu9250/inc/mpu_dmp_driver.h"
 #endif // USING_DMP
 
@@ -75,6 +76,7 @@ extern "C" void app_main(void)
 #ifdef USING_DMP
     positioning_timer_init();
     mpu_dmp_init();
+    // initAK8963_2(magCalibration);
     i2c_gpio_init();
     ins_init();
     gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
@@ -93,7 +95,9 @@ extern "C" void app_main(void)
     esp_timer_start_periodic(positioning_time3_timer, TIME3_TIMER_PERIOD);
     printf("check point 0\n");
     xCountingSemaphore_timeout3 = xSemaphoreCreateCounting(200, 0);
-    xTaskCreate(timer3_check_task, "timer3_check_task", 4096, NULL, 4, NULL);
+    xCountingSemaphore_push_data = xSemaphoreCreateCounting(200, 0);
+    xTaskCreatePinnedToCore(timer3_check_task, "timer3_check_task", 4096, NULL, 10, NULL, 1);
+    xTaskCreatePinnedToCore(raw_push_data, "raw_push_data", 4096, NULL, 8, NULL, 1);
 #endif // USING_RAW
 
 #ifdef USING_SPI
@@ -108,12 +112,13 @@ extern "C" void app_main(void)
 #endif // PSINS_ATT
 #ifdef PSINS_POS
 #ifdef PSINS_UART
+    esp_timer_start_periodic(positioning_time1_timer, TIME1_TIMER_PERIOD);
     xCountingSemaphore_timeout2 = xSemaphoreCreateCounting(200, 0);
-    xTaskCreate(timer2_check_task, "timer2_check_task", 4096, NULL, 4, NULL);
+    xTaskCreatePinnedToCore(timer2_check_task, "timer2_check_task", 4096, NULL, 7, NULL, 0);
     esp_timer_start_periodic(positioning_time2_timer, TIME2_TIMER_PERIOD);
 #endif // PSINS_UART
     xCountingSemaphore_data_update_static_psins_pos = xSemaphoreCreateCounting(200, 0);
-    xTaskCreate(data_update_static_psins_pos, "data_update_static_psins_pos", 16384, NULL, 4, NULL);
+    xTaskCreatePinnedToCore(data_update_static_psins_pos, "data_update_static_psins_pos", 16384, NULL, 9, NULL, 1);
 #endif // PSINS_POS && USING_RAW
 #ifdef USING_SFANN_SINS
     xCountingSemaphore_data_update_sins_pos = xSemaphoreCreateCounting(200, 0);

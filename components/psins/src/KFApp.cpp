@@ -1,3 +1,12 @@
+/*
+ * @Author: Zhenwei Song zhenwei.song@qq.com
+ * @Date: 2024-03-14 10:31:11
+ * @LastEditors: Zhenwei Song zhenwei.song@qq.com
+ * @LastEditTime: 2024-04-10 14:39:50
+ * @FilePath: \esp32_positioning\components\psins\src\KFApp.cpp
+ * @Description: 仅供学习交流使用
+ * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
+ */
 #include "./../inc/KFApp.h"
 
 /***************************  class CKFApp  *********************************/
@@ -46,9 +55,11 @@ void AVPUartOut(const CVect3 &att, const CVect3 &vn, const CVect3 &pos)
     out_data.Pos[2] = deg;
     out_data.Pos[3] = pos.i / DEG - deg;
     out_data.Pos[4] = pos.k;
-    //printf("out accel: %f,%f,%f\n", out_data.Accel[0], out_data.Accel[1], out_data.Accel[2]);
-    //printf("out Gyro: %f,%f,%f\n", out_data.Gyro[0], out_data.Gyro[1], out_data.Gyro[2]);
+    // printf("out accel: %f,%f,%f\n", out_data.Accel[0], out_data.Accel[1], out_data.Accel[2]);
+    // printf("out Gyro: %f,%f,%f\n", out_data.Gyro[0], out_data.Gyro[1], out_data.Gyro[2]);
+    printf("out Att: %f,%f,%f\n", out_data.Att[0], out_data.Att[1], out_data.Att[2]);
     printf("out Vn: %f,%f,%f\n", out_data.Vn[0], out_data.Vn[1], out_data.Vn[2]);
-    printf("out att: %f,%f,%f\n", out_data.Att[0], out_data.Att[1], out_data.Att[2]);
-    printf("out Pos: %f,%f,%f,%f,%f\n\n", out_data.Pos[0], out_data.Pos[1], out_data.Pos[2], out_data.Pos[3], out_data.Pos[4]);
+    printf("out Mag: %f,%f,%f\n", out_data.Magn[0], out_data.Magn[1], out_data.Magn[2]);
+    printf("out Pos: %f,%f,%f,%f,%f\n", out_data.Pos[0], out_data.Pos[1], out_data.Pos[2], out_data.Pos[3], out_data.Pos[4]);
+    printf("out Temp: %f\n\n", out_data.Temp);
 }

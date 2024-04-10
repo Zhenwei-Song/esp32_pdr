@@ -2,7 +2,7 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-03-11 15:46:52
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-03-29 16:42:22
+ * @LastEditTime: 2024-04-09 15:27:54
  * @FilePath: \esp32_positioning\main\main.h
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
@@ -21,7 +21,9 @@
 // #define USING_DMP // I2C读DMP
 
 #if !defined USING_DMP && !defined USING_RAW
-#define USING_RAW // 用直接读寄存器的方式
+#define USING_RAW     // 用直接读寄存器的方式
+#define DOWN_SAMPLING // 降采样
+#define YAW_INIT //利用磁力初始化yaw
 #endif
 
 #if defined USING_DMP || defined USING_RAW
@@ -31,12 +33,14 @@
 #if !defined USING_I2C && !defined USING_SPI
 #define USING_SPI
 #endif
+
 /* -------------------------------------------------------------------------- */
 /*                                  数据解析方式设定                                  */
 /* -------------------------------------------------------------------------- */
 //  #define PSINS_ATT //仅获取姿态角
-#define PSINS_POS  // 获取位置(包括姿态)
-#define PSINS_UART // 上传给上位机数据
+#define PSINS_POS          // 获取位置(包括姿态)
+#define PSINS_POS_ON_BOARD // 板上更新信息
+#define PSINS_UART         // 上传给上位机数据
 
 // #define USING_SFANN_SINS // 用简化的捷联惯导定位
 
@@ -46,7 +50,7 @@
 #define I2C_SCL 22
 #define I2C_SDA 21
 #define GPIO_INTR 23
-#define DEFAULT_HZ (50)     // 设置MPU9250的采样率
+#define DEFAULT_HZ (1000)   // 设置MPU9250的采样率
 #define A_RANGE A_RANGE_4   // 传感器加速度量程
 #define G_RANGE G_RANGE_500 // 传感器加速度量程
 
@@ -54,8 +58,15 @@
 #define LATITUDE 23.305836   // 纬度
 #define ALTITUDE 59          // 海拔
 
-#define my_TS 1.0 / DEFAULT_HZ
 #define SAMPLE_RATE DEFAULT_HZ
+
+#ifdef DOWN_SAMPLING
+#define OUT_SAMPING_RATE 50 // 将采样后输出频率
+#define DOWNSAMPLE_FACTOR (SAMPLE_RATE / OUT_SAMPING_RATE)
+#define my_TS 1.0 / OUT_SAMPING_RATE
+#else
+#define my_TS 1.0 / SAMPLE_RATE
+#endif
 
 #define GET_LINEAR_ACC_AND_G // 获取除去重力的线性加速度
 #endif

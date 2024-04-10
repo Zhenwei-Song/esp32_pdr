@@ -49,14 +49,27 @@ void time1_timer_cb(void);
 #endif // USING_SPI
 
 #ifdef PSINS_UART
+
+extern bool timer1_flag;
+
+extern esp_timer_handle_t positioning_time1_timer;
+
+extern SemaphoreHandle_t xCountingSemaphore_timeout1;
+
+#define TIME1_TIMER_PERIOD (1 * 1000000 / DEFAULT_HZ)
+
+void time1_timer_cb(void);
+
 extern bool timer2_flag;
 
 extern esp_timer_handle_t positioning_time2_timer;
 
 extern SemaphoreHandle_t xCountingSemaphore_timeout2;
-
-#define TIME2_TIMER_PERIOD (1 * 1000000 / DEFAULT_HZ)
-
+#ifdef DOWN_SAMPLING
+#define TIME2_TIMER_PERIOD (1 * 1000000 / OUT_SAMPING_RATE)
+#else
+#define TIME2_TIMER_PERIOD (1 * 1000000 / SAMPLE_RATE)
+#endif
 void time2_timer_cb(void);
 #endif // PSINS_UART
 #ifdef USING_RAW
@@ -68,7 +81,7 @@ extern SemaphoreHandle_t xCountingSemaphore_timeout3;
 
 // #define TIME3_TIMER_PERIOD 500000 // 500ms
 
-#define TIME3_TIMER_PERIOD (1 * 1000000 / DEFAULT_HZ) // 根据mpu频率而定
+#define TIME3_TIMER_PERIOD (1 * 1000000 / SAMPLE_RATE) // 根据mpu频率而定
 
 void time3_timer_cb(void);
 #endif // USING_RAW

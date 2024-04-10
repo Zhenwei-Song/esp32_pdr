@@ -2,7 +2,7 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-03-25 15:11:51
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-03-26 12:08:09
+ * @LastEditTime: 2024-04-08 15:49:20
  * @FilePath: \esp32_positioning\main\all_tasks.h
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
@@ -20,12 +20,15 @@
 #include "freertos/task.h"
 
 #ifdef USING_DMP
+// extern float magCalibration[3];
 void ins_init(void);
 void gpio_task(void *arg);
 #endif
 
 #ifdef USING_RAW
+extern SemaphoreHandle_t xCountingSemaphore_push_data;
 void timer3_check_task(void *pvParameters);
+void raw_push_data(void *pvParameters);
 #endif // USING_RAW
 
 #ifdef ONLY_ATT

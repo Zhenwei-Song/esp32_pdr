@@ -8,11 +8,15 @@
 #include "./../components/my_uart/inc/my_uart.h"
 
 #ifdef USING_DMP
+#include "./../components/mpu9250/inc/inv_mpu.h"
 #include "./../components/mpu9250/inc/mpu_dmp_driver.h"
 #endif // USING_DMP
 
 #ifdef USING_RAW
 #include "./../components/mpu9250/inc/mpu9250_raw.h"
+#ifdef YAW_INIT
+#include "./../components/yaw_init_by_mag/inc/yaw_init_by_mag.h"
+#endif // YAW_INIT
 #endif // USING_RAW
 
 #ifdef USING_INS
@@ -39,13 +43,14 @@
 #endif // USING_SFANN_SINS
 
 #ifdef USING_DMP
+// float magCalibration[3];
 static bool data_updated = true;
 static s_point new_point;
 
 #endif // USING_DMP
 
 #ifdef USING_RAW
-short gyr[3], acc[3], mag[3];
+SemaphoreHandle_t xCountingSemaphore_push_data;
 #endif // USING_RAW
 
 #ifdef PSINS_ATT
@@ -83,6 +88,7 @@ void ins_init(void)
 void gpio_task(void *arg)
 {
     uint32_t io_num;
+    // static int16_t magCount[3];
     s_point point_got;
     for (;;) {
         if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
@@ -113,6 +119,8 @@ void gpio_task(void *arg)
                     mpu_Data_value.Accel[i] = (double)mpu_AD_value.Accel[i] / (double)A_RANGE_NUM;
                     mpu_Data_value.Gyro[i] = (double)mpu_AD_value.Accel[i] / (double)65.5;
                 }
+                // readMagData(magCount);
+                // printf("readMagData:(%d,%d,%d)\n", magCount[0], magCount[1], magCount[2]);
 // printf("new_point.acc:(%.3f,%.3f,%.3f)\n", new_point.acc[0], new_point.acc[1], new_point.acc[2]);
 // printf("new_point.linear_acc:(%.3f,%.3f,%.3f)\n", new_point.linear_acc[0], new_point.linear_acc[1], new_point.linear_acc[2]);
 // printf("new_point.gyr(rad):(%.3f,%.3f,%.3f)\n", new_point.gyr[0], new_point.gyr[1], new_point.gyr[2]);
@@ -183,32 +191,97 @@ void gpio_task(void *arg)
  */
 void timer3_check_task(void *pvParameters)
 {
+#ifdef DOWN_SAMPLING
+    static int temp_count;
+    short temp_gyr[3];
+    short temp_acc[3];
+    short temp_mag[3];
+    short temp_tem;
+    static int sum_gyr[3];
+    static int sum_acc[3];
+    static int sum_mag[3];
+    static int sum_tem;
+#endif
     while (1) {
         if (xSemaphoreTake(xCountingSemaphore_timeout3, portMAX_DELAY) == pdTRUE) // 得到了信号量
         {
-            RAW_MPU_Get_Gyroscope(&gyr[0], &gyr[1], &gyr[2]);     // 读取角速度原始数据
-            RAW_MPU_Get_Accelerometer(&acc[0], &acc[1], &acc[2]); // 读取角加速度原始数据
-            RAW_MPU_Get_Magnetometer(&mag[0], &mag[1], &mag[2]);  // 读取磁力计原始数据
-            printf("Accx:%d,Accy:%d,Accz:%d\nGyrox:%d,Gyroy:%d,Gyroz:%d\nMagx:%d,Magy:%d,Magz:%d\n\n",
-                   acc[0], acc[1], acc[2], gyr[0], gyr[1], gyr[2], mag[0], mag[1], mag[2]); // 源数据串口输出
+            // printf("timer3_check_task\n");
+#ifdef DOWN_SAMPLING
+            if (temp_count < DOWNSAMPLE_FACTOR) {
+                RAW_MPU_Get_Gyroscope(&temp_gyr[0], &temp_gyr[1], &temp_gyr[2]);     // 读取角速度原始数据
+                RAW_MPU_Get_Accelerometer(&temp_acc[0], &temp_acc[1], &temp_acc[2]); // 读取角加速度原始数据
+                RAW_MPU_Get_Magnetometer(&temp_mag[0], &temp_mag[1], &temp_mag[2]);  // 读取磁力计原始数据
+                temp_tem = RAW_MPU_Get_Temperature();
+                for (int j = 0; j < 3; j++) {
+                    sum_gyr[j] = sum_gyr[j] + temp_gyr[j];
+                    sum_acc[j] = sum_acc[j] + temp_acc[j];
+                    sum_mag[j] = sum_mag[j] + temp_mag[j];
+                }
+                sum_tem = sum_tem + temp_tem;
+                temp_count = temp_count + 1;
+                timer3_flag = false;
+                // printf("temp_count %d\n", temp_count);
+            }
+            else {
+                for (int j = 0; j < 3; j++) {
+                    sum_gyr[j] = sum_gyr[j] / DOWNSAMPLE_FACTOR;
+                    sum_acc[j] = sum_acc[j] / DOWNSAMPLE_FACTOR;
+                    sum_mag[j] = sum_mag[j] / DOWNSAMPLE_FACTOR;
+                }
+                sum_tem = sum_tem / DOWNSAMPLE_FACTOR;
+                for (int j = 0; j < 3; j++) {
+                    raw_gyr[j] = (short)sum_gyr[j];
+                    raw_acc[j] = (short)sum_acc[j];
+                    raw_mag[j] = (short)sum_mag[j];
+                }
+                raw_tem = (short)sum_tem;
+                temp_count = 0;
+                // printf("down sampling\n");
+                xSemaphoreGive(xCountingSemaphore_push_data);
+                timer3_flag = false;
+            }
+#else
+            RAW_MPU_Get_Gyroscope(&raw_gyr[0], &raw_gyr[1], &raw_gyr[2]);     // 读取角速度原始数据
+            RAW_MPU_Get_Accelerometer(&raw_acc[0], &raw_acc[1], &raw_acc[2]); // 读取角加速度原始数据
+            RAW_MPU_Get_Magnetometer(&raw_mag[0], &raw_mag[1], &raw_mag[2]);  // 读取磁力计原始数据
+            raw_tem = RAW_MPU_Get_Temperature();
+            // printf("Accx:%d,Accy:%d,Accz:%d\nGyrox:%d,Gyroy:%d,Gyroz:%d\nMagx:%d,Magy:%d,Magz:%d\n\n",
+            //        raw_acc[0], raw_acc[1], raw_acc[2], raw_gyr[0], raw_gyr[1], raw_gyr[2], raw_mag[0], raw_mag[1], raw_mag[2]); // 源数据串口输出
+            xSemaphoreGive(xCountingSemaphore_push_data);
+#endif // DOWN_SAMPLING
+        }
+    }
+}
+
+void raw_push_data(void *pvParameters)
+{
+    while (1) {
+        if (xSemaphoreTake(xCountingSemaphore_push_data, portMAX_DELAY) == pdTRUE) // 得到了信号量
+        {
 #if defined PSINS_ATT || defined PSINS_POS
             for (int i = 0; i < 3; i++) {
-                mpu_AD_value.Accel[i] = acc[i];
-                mpu_AD_value.Gyro[i] = gyr[i];
-                mpu_AD_value.Mag[i] = mag[i];
-
+                mpu_AD_value.Accel[i] = raw_acc[i];
+                mpu_AD_value.Gyro[i] = raw_gyr[i];
+                mpu_AD_value.Mag[i] = raw_mag[i];
+                mpu_AD_value.Temp = raw_tem;
                 mpu_Data_value.Accel[i] = (double)mpu_AD_value.Accel[i] / (double)A_RANGE_NUM;
-                mpu_Data_value.Gyro[i] = (double)mpu_AD_value.Accel[i] / (double)65.5;
+                mpu_Data_value.Gyro[i] = (double)mpu_AD_value.Gyro[i] / (double)65.5;
                 mpu_Data_value.Mag[i] = mpu_AD_value.Mag[i] * (double)0.25 * ((double)1 + ((double)mag_sensitivity[i] - (double)128) / (double)256);
+                mpu_Data_value.Temp = ((double)mpu_AD_value.Temp / (double)333.87) + (double)21;
             }
-// printf("A_RANGE_NUM:%d\n", A_RANGE_NUM);
-// printf("mag_sensitivity:%d,%d,%d\n", mag_sensitivity[0], mag_sensitivity[1], mag_sensitivity[2]);
+#ifdef YAW_INIT
+            for (int j = 0; j < 3; j++) {
+                imu_acc[j] = ((float)raw_acc[j]) * ACC_gPerLSB;
+                imu_mag[j] = ((float)raw_mag[j]) * mpu_Data_value.Mag[j] * MAG_uTPerLSB;
+            }
+            imuDataAvailable = 1;
+#endif // YAW_INIT
 #endif // defined PSINS_ATT || defined PSINS_POS
 
 #ifdef USING_SFANN_SINS
             for (int i = 0; i < 3; i++) {
-                wm_data[i] = gyr[i];
-                vm_data[i] = acc[i];
+                wm_data[i] = raw_gyr[i];
+                vm_data[i] = raw_acc[i];
             }
 #endif // USING_SFANN_SINS
 
@@ -227,6 +300,7 @@ void timer3_check_task(void *pvParameters)
         }
     }
 }
+
 #endif // USING_RAW
 
 #ifdef PSINS_ATT
@@ -274,11 +348,15 @@ void data_update_static_psins_pos(void *pvParameters)
     psins_uart_init();
     double yaw0 = C360CC180(0 * glv.deg); // 北偏东为正
     CVect3 gpspos = LLH(LATITUDE, LONGITUDE, ALTITUDE);
-    kf.Init(CSINS(a2qua(CVect3(0, 0, yaw0)), O31, gpspos));       // 请正确初始化方位和位置
-    CVect3 eb = CVect3(5.038168, 2.120916, 126.437557) * glv.dps; // 陀螺零偏 deg/s
-    //CVect3 db = CVect3(0.0040283, 0.016958, 1.0010945) * glv.g0;
-     CVect3 db = O31;
-    // CVect3 eb = O31;
+    kf.Init(CSINS(a2qua(CVect3(0, 0, yaw0)), O31, gpspos)); // 请正确初始化方位和位置
+#if 1
+    CVect3 eb = CVect3(-1.023, 0.611, 134.473) * glv.dps; // 陀螺零偏 deg/s
+    // CVect3 db = CVect3(0.0040283, 0.016958, 1.0010945) * glv.g0;
+    CVect3 db = O31;
+#else
+    CVect3 db = O31;
+    CVect3 eb = O31;
+#endif
     // static double sum_att[3] = {0};
     // static double sum_v[3] = {0};
     // int k = 0;
@@ -291,16 +369,9 @@ void data_update_static_psins_pos(void *pvParameters)
 #endif
     while (1) {
         if (xSemaphoreTake(xCountingSemaphore_data_update_static_psins_pos, portMAX_DELAY) == pdTRUE) {
-            // kf.SetCalcuBurden(TIM2->CNT, 0);
-            // kf.SetCalcuBurden(100, 0);
+#ifdef PSINS_POS_ON_BOARD
             CVect3 wm = (*(CVect3 *)mpu_Data_value.Gyro * glv.dps - eb) * my_TS;
             CVect3 vm = (*(CVect3 *)mpu_Data_value.Accel * glv.g0 - db) * my_TS;
-            // for (int i = 0; i < 3; i++) {
-            //     tmp1[i] = (mpu_Data_value.Gyro[i] * glv.dps - 0) * my_TS;
-            //     tmp2[i] = (mpu_Data_value.Accel[i] * glv.dps - 0) * my_TS;
-            // }
-            // printf("wm:%f,%f,%f\n", tmp1[0], tmp1[1], tmp1[2]);
-            // printf("vm:%f,%f,%f\n", tmp2[0], tmp2[1], tmp2[2]);
             kf.Update(&wm, &vm, 1, my_TS, 5);
             AVPUartOut(kf);
             // if (k != 200 && k >= 100) {
@@ -323,17 +394,16 @@ void data_update_static_psins_pos(void *pvParameters)
             //     printf("warning ave Accel:(%f,%f,%f)\n", ave_v[0], ave_v[1], ave_v[2]);
             //     printf("warning ave att:(%f,%f,%f)\n", ave_att[0], ave_att[1], ave_att[2]);
             // }
-            // Data_updata();
-            // psins_sendData_tx(TX_TAG, (const char *)Usart1_out_DATA,35*4);
-            printf("mpu_AD_value.Accel:(%d,%d,%d)\n", mpu_AD_value.Accel[0], mpu_AD_value.Accel[1], mpu_AD_value.Accel[2]);
-            printf("mpu_AD_value.Gyro:(%d,%d,%d)\n", mpu_AD_value.Gyro[0], mpu_AD_value.Gyro[1], mpu_AD_value.Gyro[2]);
-            printf("mpu_Data_value.Accel:(%f,%f,%f)\n", mpu_Data_value.Accel[0], mpu_Data_value.Accel[1], mpu_Data_value.Accel[2]);
-            printf("mpu_Data_value.Gyro:(%f,%f,%f)\n\n", mpu_Data_value.Gyro[0], mpu_Data_value.Gyro[1], mpu_Data_value.Gyro[2]);
-            // printf("mpu_Data_value.Mag:(%f,%f,%f)\n", mpu_Data_value.Mag[0], mpu_Data_value.Mag[1], mpu_Data_value.Mag[2]);
+            // printf("mpu_AD_value.Accel:(%d,%d,%d)\n", mpu_AD_value.Accel[0], mpu_AD_value.Accel[1], mpu_AD_value.Accel[2]);
+            // printf("mpu_AD_value.Gyro:(%d,%d,%d)\n", mpu_AD_value.Gyro[0], mpu_AD_value.Gyro[1], mpu_AD_value.Gyro[2]);
+            // printf("mpu_Data_value.Accel:(%f,%f,%f)\n", mpu_Data_value.Accel[0], mpu_Data_value.Accel[1], mpu_Data_value.Accel[2]);
+            // printf("mpu_Data_value.Gyro:(%f,%f,%f)\n\n", mpu_Data_value.Gyro[0], mpu_Data_value.Gyro[1], mpu_Data_value.Gyro[2]);
+// printf("mpu_Data_value.Mag:(%f,%f,%f)\n", mpu_Data_value.Mag[0], mpu_Data_value.Mag[1], mpu_Data_value.Mag[2]);
+#endif // PSINS_POS_ON_BOARD
 #ifdef USING_DMP
             data_updated = true;
 #endif
-#ifdef USING_RAW
+#ifdef USING_RAW && !defined DOWN_SAMPLING
             timer3_flag = false;
 #endif
         }
@@ -417,7 +487,7 @@ void data_update_sins_pos(void *pvParameters)
             SetData_Matrix(pos, pos_data);
             SetData_Matrix(qnb, qnb_data);
             ShowWrite_Matrix(Trans_Matrix(avptq));
-#ifdef USING_RAW
+#if defined USING_RAW && !defined DOWN_SAMPLING
             timer3_flag = false;
 #endif
 #ifdef USING_DMP

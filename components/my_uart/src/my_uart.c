@@ -2,7 +2,7 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-03-26 16:11:33
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-03-28 10:56:58
+ * @LastEditTime: 2024-04-02 20:09:13
  * @FilePath: \esp32_positioning\components\my_uart\src\my_uart.c
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
@@ -14,7 +14,7 @@ int RX_BUF_SIZE = 1024;
 void psins_uart_init(void)
 {
     const uart_config_t uart_config = {
-        .baud_rate = 460800,                   // 设置波特率    115200
+        .baud_rate = 500000,                   // 设置波特率    115200
         .data_bits = UART_DATA_8_BITS,         // 设置数据位    8位
         .parity = UART_PARITY_DISABLE,         // 设置奇偶校验  不校验
         .stop_bits = UART_STOP_BITS_1,         // 设置停止位    1
