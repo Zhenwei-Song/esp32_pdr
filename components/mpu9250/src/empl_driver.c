@@ -9,7 +9,7 @@
  */
 
 #include "./../inc/empl_driver.h"
-#include "./../inc/mpu9250_spi.h"
+
 
 #include <inttypes.h>
 #include <stdbool.h>

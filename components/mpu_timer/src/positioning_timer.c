@@ -3,7 +3,7 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-01-16 15:05:32
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-04-09 09:36:17
+ * @LastEditTime: 2024-04-18 19:20:49
  * @FilePath: \esp32_positioning\components\mpu_timer\src\positioning_timer.c
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
@@ -75,7 +75,7 @@ void positioning_timer_init(void)
 
 #ifdef USING_SPI
 /**
- * @description: timer1超时函数，用于time1
+ * @description: 用于定时直接从mpu9250寄存器读取数据（raw，spi）
  * @return {*}
  */
 void time1_timer_cb(void)
@@ -91,13 +91,18 @@ void time1_timer_cb(void)
 #endif // USING_SPI
 
 #ifdef PSINS_UART
+/**
+ * @description:用于串口输出数据给上位机时，更新开发板运行时间
+ * @return {*}
+ */
 void time1_timer_cb(void)
 {
     OUT_cnt = OUT_cnt + 1000 / DEFAULT_HZ;
+    // printf("OUT_cnt %ld\n", OUT_cnt);
 }
 
 /**
- * @description: timer2超时函数，用于time2
+ * @description: 用于串口输出数据给上位机
  * @return {*}
  */
 void time2_timer_cb(void)
@@ -111,14 +116,14 @@ void time2_timer_cb(void)
         timer2_flag = true;
     }
     else {
-        //printf("\n\ntimer 2 block warning\n\n");
+        printf("\n\ntimer 2 block warning\n\n");
     }
 }
 #endif // PSINS_UART
 
 #ifdef USING_RAW
 /**
- * @description: timer3超时函数，用于time3
+ * @description: 用于定时直接从mpu9250寄存器读取数据（raw，i2c）
  * @return {*}
  */
 void time3_timer_cb(void)
@@ -132,7 +137,7 @@ void time3_timer_cb(void)
         timer3_flag = true;
     }
     else {
-        //printf("\n\ntimer 3 warning\n\n");
+        printf("\n\ntimer 3 warning\n\n");
     }
 }
 #endif // USING_RAW

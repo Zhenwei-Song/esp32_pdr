@@ -13,8 +13,10 @@ uint8_t RAW_MPU9250_Init(void)
     esp32_delay_ms(100);                                   // 延时100ms
     MPU_Write_Byte(MPU9250_ADDR, MPU_PWR_MGMT1_REG, 0x01); // 打开温度传感器  设置时钟
     MPU_Write_Byte(MPU9250_ADDR, MPU_PWR_MGMT1_REG, 0X00); // 唤醒MPU9250
-    MPU_Set_Gyro_Fsr(1);                                   // 陀螺仪传感器,±500dps
-    MPU_Set_Accel_Fsr(1);                                  // 加速度传感器,±4g
+    //MPU_Set_Gyro_Fsr(1);                                   // 陀螺仪传感器,±500dps
+    //MPU_Set_Accel_Fsr(1);                                  // 加速度传感器,±4g
+    MPU_Set_Gyro_Fsr(0);
+    MPU_Set_Accel_Fsr(0);
     //MPU_Write_Byte(MPU9250_ADDR, ACCEL_CONFIG_2, 0x48);    // 加速度计滤波频率 1K OUT   200平滑(新增)
     //MPU_Write_Byte(MPU9250_ADDR, CONFIG, 0x43);            // 低通滤波时间（新增）
     MPU_Set_Rate(DEFAULT_HZ);                              // 设置陀螺仪采样率
@@ -99,7 +101,7 @@ uint8_t MPU_Set_Rate(uint16_t rate)
         rate = 4;
     data = 1000 / rate - 1;
     data = MPU_Write_Byte(MPU9250_ADDR, MPU_SAMPLE_RATE_REG, data); // 设置数字低通滤波器
-    //return MPU_Set_LPF(rate / 2);                                   // 自动设置LPF为采样率的一半
+    return MPU_Set_LPF(rate / 5);                                   // 自动设置LPF为采样率的一半
     return 0;
 }
 
@@ -149,20 +151,25 @@ uint8_t RAW_MPU_Get_Accelerometer(short *ax, short *ay, short *az)
 //     其他,错误代码
 uint8_t RAW_MPU_Get_Magnetometer(short *mx, short *my, short *mz)
 {
+    uint8_t res;
     uint8_t buf[6];
     MPU_Read_Len(AK8963_ADDR, MAG_XOUT_L, 6, buf);
     *mx = ((uint16_t)buf[1] << 8) | buf[0];
     *my = ((uint16_t)buf[3] << 8) | buf[2];
     *mz = ((uint16_t)buf[5] << 8) | buf[4];
-    MPU_Write_Byte(AK8963_ADDR, MAG_CNTL1, 0X11); // AK8963每次读完以后都需要重新设置为单次测量模式
+    res= MPU_Write_Byte(AK8963_ADDR, MAG_CNTL1, 0X11); // AK8963每次读完以后都需要重新设置为单次测量模式
+    if(res != 0){
+        printf("Error mag write\n");
+    }
     return 0;
     ;
 }
 
 uint8_t MPU_Write_Byte(uint8_t devaddr, uint8_t reg, uint8_t data)
 {
-    esp32_i2c_write(devaddr, reg, 1, &data);
-    return 0;
+    uint8_t res;
+    res = esp32_i2c_write(devaddr, reg, 1, &data);
+    return res;
 }
 
 uint8_t MPU_Read_Byte(uint8_t devaddr, uint8_t reg)

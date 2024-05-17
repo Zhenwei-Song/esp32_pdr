@@ -2,7 +2,7 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-03-11 15:46:52
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-04-09 15:27:54
+ * @LastEditTime: 2024-05-13 13:15:05
  * @FilePath: \esp32_positioning\main\main.h
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
@@ -21,9 +21,10 @@
 // #define USING_DMP // I2C读DMP
 
 #if !defined USING_DMP && !defined USING_RAW
-#define USING_RAW     // 用直接读寄存器的方式
-#define DOWN_SAMPLING // 降采样
-#define YAW_INIT //利用磁力初始化yaw
+#define USING_RAW // 用直接读寄存器的方式
+// #define DOWN_SAMPLING // 降采样
+#define YAW_INIT // 利用磁力初始化yaw
+// #define GET_ACC_WITHOUT_G //RAW模式下获取去除了重力分量之后的加速度，用于加速度零偏处理
 #endif
 
 #if defined USING_DMP || defined USING_RAW
@@ -51,25 +52,37 @@
 #define I2C_SDA 21
 #define GPIO_INTR 23
 #define DEFAULT_HZ (1000)   // 设置MPU9250的采样率
-#define A_RANGE A_RANGE_4   // 传感器加速度量程
-#define G_RANGE G_RANGE_500 // 传感器加速度量程
+#define G_RANGE G_RANGE_250 // 传感器角速度量程
+#define A_RANGE A_RANGE_2   // 传感器加速度量程
 
 #define LONGITUDE 113.572256 // 经度
 #define LATITUDE 23.305836   // 纬度
-#define ALTITUDE 59          // 海拔
+#define ALTITUDE 36          // 海拔
 
-#define SAMPLE_RATE DEFAULT_HZ
+#define WAIT_TIME 3000   // 秒乘1000
+#define ALIGN_TIME 30000 // 秒乘1000
+// #define ALIGN_TIME 10000 // 秒乘1000
+#define ZERO_BIAS_CAL_TIME 7000
+/* -------------------------------------------------------------------------- */
+/*                                  降采样速率相关设置                                 */
+/* -------------------------------------------------------------------------- */
+#define SAMPLE_RATE (200)
+#define MAG_SAMPLE_RATE 200
+#define MAG_SAMPLE_FACTOR (SAMPLE_RATE / MAG_SAMPLE_RATE)
 
 #ifdef DOWN_SAMPLING
 #define OUT_SAMPING_RATE 50 // 将采样后输出频率
 #define DOWNSAMPLE_FACTOR (SAMPLE_RATE / OUT_SAMPING_RATE)
-#define my_TS 1.0 / OUT_SAMPING_RATE
+#define my_TS (1.0 / OUT_SAMPING_RATE)
 #else
-#define my_TS 1.0 / SAMPLE_RATE
-#endif
+#define my_TS (1.0 / SAMPLE_RATE)
+#endif // DOWN_SAMPLING
 
+#ifdef USING_DMP
 #define GET_LINEAR_ACC_AND_G // 获取除去重力的线性加速度
-#endif
+#endif                       // USING_DMP
+
+#endif // USING_I2C
 
 #if (A_RANGE == A_RANGE_2)
 #define A_RANGE_NUM A_RANGE_2_NUM
@@ -88,7 +101,9 @@
 #if !defined USING_PSINS && !defined USING_INS && !defined USING_SFANN_SINS
 #define USING_INS
 #endif
-
+/* -------------------------------------------------------------------------- */
+/*                                   编译警示信息                                   */
+/* -------------------------------------------------------------------------- */
 #ifdef USING_SPI
 #warning Using spi!!!!!!
 #endif
@@ -100,7 +115,9 @@
 #ifdef USING_RAW
 #warning Using raw!!!!!!
 #endif
-
+/* -------------------------------------------------------------------------- */
+/*                                   编译错误信息                                   */
+/* -------------------------------------------------------------------------- */
 #if defined USING_I2C && defined USING_SPI
 #error "Can't use I2C and SPI at the same time!"
 #endif

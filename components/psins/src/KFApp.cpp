@@ -2,12 +2,14 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-03-14 10:31:11
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-04-10 14:39:50
+ * @LastEditTime: 2024-05-09 18:44:25
  * @FilePath: \esp32_positioning\components\psins\src\KFApp.cpp
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
  */
 #include "./../inc/KFApp.h"
+
+float my_v[3] = {0};
 
 /***************************  class CKFApp  *********************************/
 CKFApp::CKFApp(double ts) : CSINSGNSS(19, 6, ts)
@@ -41,25 +43,46 @@ void AVPUartOut(const CKFApp &kf)
 
 void AVPUartOut(const CVect3 &att, const CVect3 &vn, const CVect3 &pos)
 {
-    out_data.Att[0] = att.i / DEG;
-    out_data.Att[1] = att.j / DEG;
-    out_data.Att[2] = CC180C360(att.k) / DEG;
-    out_data.Vn[0] = vn.i;
-    out_data.Vn[1] = vn.j;
-    out_data.Vn[2] = vn.k;
-    int deg;
-    deg = (int)(pos.j / DEG);
-    out_data.Pos[0] = deg;
-    out_data.Pos[1] = pos.j / DEG - deg;
-    deg = (int)(pos.i / DEG);
-    out_data.Pos[2] = deg;
-    out_data.Pos[3] = pos.i / DEG - deg;
-    out_data.Pos[4] = pos.k;
+    // out_data.Att[0] = att.i / DEG;
+    // out_data.Att[1] = att.j / DEG;
+    // out_data.Att[2] = CC180C360(att.k) / DEG;
+
+    // out_data.Vn[0] = vn.i;
+    // out_data.Vn[1] = vn.j;
+    // out_data.Vn[2] = vn.k;
+    // int deg;
+    // deg = (int)(pos.j / DEG);
+    // out_data.Pos[0] = deg;
+    // out_data.Pos[1] = pos.j / DEG - deg;
+    // deg = (int)(pos.i / DEG);
+    // out_data.Pos[2] = deg;
+    // out_data.Pos[3] = pos.i / DEG - deg;
+    // out_data.Pos[4] = pos.k;
+
+    // out_data.Vn[0] = my_v[0];
+    // out_data.Vn[1] = my_v[1];
+    // out_data.Vn[2] = my_v[2];
+    out_data.GPS_Vn[0] = my_v[0];
+    out_data.GPS_Vn[1] = my_v[1];
+    out_data.GPS_Vn[2] = my_v[2];
+
+    out_data.Att[0] = temp_out_data[8];
+    out_data.Att[1] = temp_out_data[9];
+    out_data.Att[2] = temp_out_data[10];
+    out_data.Vn[0] = temp_out_data[0];
+    out_data.Vn[1] = temp_out_data[1];
+    out_data.Vn[2] = temp_out_data[2];
+    out_data.Pos[0] = temp_out_data[3];
+    out_data.Pos[1] = temp_out_data[4];
+    out_data.Pos[2] = temp_out_data[5];
+    out_data.Pos[3] = temp_out_data[6];
+    out_data.Pos[4] = temp_out_data[7];
+
     // printf("out accel: %f,%f,%f\n", out_data.Accel[0], out_data.Accel[1], out_data.Accel[2]);
     // printf("out Gyro: %f,%f,%f\n", out_data.Gyro[0], out_data.Gyro[1], out_data.Gyro[2]);
-    printf("out Att: %f,%f,%f\n", out_data.Att[0], out_data.Att[1], out_data.Att[2]);
-    printf("out Vn: %f,%f,%f\n", out_data.Vn[0], out_data.Vn[1], out_data.Vn[2]);
-    printf("out Mag: %f,%f,%f\n", out_data.Magn[0], out_data.Magn[1], out_data.Magn[2]);
-    printf("out Pos: %f,%f,%f,%f,%f\n", out_data.Pos[0], out_data.Pos[1], out_data.Pos[2], out_data.Pos[3], out_data.Pos[4]);
-    printf("out Temp: %f\n\n", out_data.Temp);
+    // printf("out Att: %f,%f,%f\n", out_data.Att[0], out_data.Att[1], out_data.Att[2]);
+    // printf("out Vn: %f,%f,%f\n", out_data.Vn[0], out_data.Vn[1], out_data.Vn[2]);
+    // // printf("out Mag: %f,%f,%f\n", out_data.Magn[0], out_data.Magn[1], out_data.Magn[2]);
+    // printf("out Pos: %f,%f,%f,%f,%f\n\n", out_data.Pos[0], out_data.Pos[1], out_data.Pos[2], out_data.Pos[3], out_data.Pos[4]);
+    // printf("out Temp: %f\n\n", out_data.Temp);
 }

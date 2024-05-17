@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define pi 3.141592653589793
+//#define pi 3.141592653589793
 //#define DEG (pi / 180.0)
 
 #define SRC_USART1_DR (&(USART1->DR))

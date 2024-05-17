@@ -4,6 +4,8 @@
 #include "./../inc/rv2que.h"
 #include "./../inc/que2mat.h"
 
+#include "./../../../main/main.h"
+
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
@@ -93,7 +95,12 @@ Matrix my_insupdate(Matrix qnb, Matrix vn1, Matrix pos, Matrix wm, Matrix vm, do
 	att_data[1] = PickInMat(att, 2, 1);
 	att_data[2] = fmod(PickInMat(att, 3, 1), 2 * pi);
 	SetData_Matrix(att, att_data);
-	//Show_Matrix(att, "att = ");//
+
+    out_data.Att[0] = (float)att_data[0];
+    out_data.Att[1] = (float)att_data[1];
+    out_data.Att[2] = (float)att_data[2];
+
+    //Show_Matrix(att, "att = ");//
 
 	//æÿ’Û∆¥Ω”
 	double cvpta_data[14] = { PickInMat(att, 1, 1), PickInMat(att, 2, 1), PickInMat(att, 3, 1),

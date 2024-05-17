@@ -2,15 +2,15 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-03-11 15:53:52
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-03-13 09:53:44
- * @FilePath: \esp32_positioning\components\psin\src\mcu_init.c
+ * @LastEditTime: 2024-04-17 14:37:40
+ * @FilePath: \esp32_positioning\components\psins\src\mcu_init.c
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
  */
 #include "./../inc/mcu_init.h"
 #include "./../../main/main.h"
 #include "./../../mpu9250/inc/empl_driver.h"
-#include "./../../mpu9250/inc/mpu9250_spi.h"
+// #include "./../../mpu9250/inc/mpu9250_spi.h"
 #include "./../../mpu_timer/inc/positioning_timer.h"
 
 uint8_t mcu_init_gpscfg = 0;
@@ -43,10 +43,11 @@ void mcu_init()
     printf("mcu_init\n");
     positioning_timer_init();
     my_gpio_init();
-    my_spi_init();
-    Init_MPU9250();
 #ifdef USING_SPI
+    my_spi_init();
     esp_timer_start_periodic(positioning_time1_timer, TIME1_TIMER_PERIOD);
 #endif // USING_SPI
+    Init_MPU9250();
+
     printf("mcu_init done\n");
 }

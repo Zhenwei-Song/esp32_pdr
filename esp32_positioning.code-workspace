@@ -15,7 +15,8 @@
 			"empl_driver.h": "c",
 			"range.h": "c",
 			"mpu9250_raw.h": "c",
-			"que2mat.h": "c"
+			"que2mat.h": "c",
+			"*.cpp__": "c"
 		}
 	}
 }

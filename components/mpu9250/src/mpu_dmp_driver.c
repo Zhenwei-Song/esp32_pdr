@@ -769,7 +769,7 @@ typedef struct {
 } eulerAngles;
 
 vector3D linearAcc = {0, 0, 0};
-vector3D gravity = {0.0, 0.0, 9.8};
+vector3D gravity = {0.0, 0.0, -9.8};
 eulerAngles angles = {0, 0, 0};
 
 // 计算旋转矩阵
@@ -782,17 +782,29 @@ void calculate_rotation_matrix(eulerAngles angles, float rotationMatrix[3][3])
     float cosYaw = cos(degrees_to_radians(angles.yaw));
     float sinYaw = sin(degrees_to_radians(angles.yaw));
 
-    rotationMatrix[0][0] = cosPitch * cosYaw;
-    rotationMatrix[0][1] = cosPitch * sinYaw;
-    rotationMatrix[0][2] = -sinPitch;
+    // rotationMatrix[0][0] = cosPitch * cosYaw;
+    // rotationMatrix[0][1] = cosPitch * sinYaw;
+    // rotationMatrix[0][2] = -sinPitch;
 
-    rotationMatrix[1][0] = sinRoll * sinPitch * cosYaw - cosRoll * sinYaw;
-    rotationMatrix[1][1] = sinRoll * sinPitch * sinYaw + cosRoll * cosYaw;
-    rotationMatrix[1][2] = sinRoll * cosPitch;
+    // rotationMatrix[1][0] = sinRoll * sinPitch * cosYaw - cosRoll * sinYaw;
+    // rotationMatrix[1][1] = sinRoll * sinPitch * sinYaw + cosRoll * cosYaw;
+    // rotationMatrix[1][2] = sinRoll * cosPitch;
 
-    rotationMatrix[2][0] = cosRoll * sinPitch * cosYaw + sinRoll * sinYaw;
-    rotationMatrix[2][1] = cosRoll * sinPitch * sinYaw - sinRoll * cosYaw;
-    rotationMatrix[2][2] = cosRoll * cosPitch;
+    // rotationMatrix[2][0] = cosRoll * sinPitch * cosYaw + sinRoll * sinYaw;
+    // rotationMatrix[2][1] = cosRoll * sinPitch * sinYaw - sinRoll * cosYaw;
+    // rotationMatrix[2][2] = cosRoll * cosPitch;
+
+    rotationMatrix[0][0] = cosYaw * cosPitch + sinYaw * sinRoll * sinPitch;
+    rotationMatrix[0][1] = -cosYaw * sinPitch + sinYaw * sinRoll * sinPitch;
+    rotationMatrix[0][2] = -sinYaw * cosRoll;
+
+    rotationMatrix[1][0] = sinPitch * cosRoll;
+    rotationMatrix[1][1] = cosPitch * cosRoll;
+    rotationMatrix[1][2] = sinRoll;
+
+    rotationMatrix[2][0] = sinYaw * sinPitch - cosYaw * sinRoll * sinPitch;
+    rotationMatrix[2][1] = -sinYaw * sinPitch - cosYaw * sinRoll * cosPitch;
+    rotationMatrix[2][2] = cosYaw * cosRoll;
 }
 
 // 剔除重力加速度
@@ -878,8 +890,8 @@ void dmp_get_data(ps_point point)
         }
         if (!more)
             hal.new_gyro = 0;
-        printf("gyro_fifo:%d,%d,%d\n", gyro[0], gyro[1], gyro[2]);
-        printf("accel_fifo:%d,%d,%d\n", accel[0], accel[1], accel[2]);
+        //printf("gyro_fifo:%d,%d,%d\n", gyro[0], gyro[1], gyro[2]);
+        //printf("accel_fifo:%d,%d,%d\n", accel[0], accel[1], accel[2]);
         for (int i = 0; i < 3; i++) {
             point->gyr_fifo[i] = gyro[i];
             point->acc_fifo[i] = accel[i];
@@ -898,14 +910,17 @@ void dmp_get_data(ps_point point)
             //  pitch = asin(-2 * q1 * q3 + 2 * q0 * q2) * 57.3;
             //  roll = atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2 * q2 + 1) * 57.3;
             //  yaw = atan2(2 * (q1 * q2 + q0 * q3), q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3) * 57.3;
-            roll = -atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2 * q2 + 1);
-            pitch = -asin(2 * q0 * q2 - 2 * q1 * q3);
+            pitch = asin(2 * q0 * q2 - 2 * q1 * q3);
+            roll = atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2 * q2 + 1);
             yaw = atan2(2 * (q1 * q2 + q0 * q3), 1 - 2 * q2 * q2 - 2 * q3 * q3);
             pitch_deg = pitch * 57.29578;
             roll_deg = roll * 57.29578;
             yaw_deg = yaw * 57.29578;
-            point->gyr[0] = roll;
-            point->gyr[1] = pitch;
+            // point->gyr[0] = roll;
+            // point->gyr[1] = pitch;
+            // point->gyr[2] = yaw;
+            point->gyr[0] = pitch;
+            point->gyr[1] = roll;
             point->gyr[2] = yaw;
             printf("roll_deg:%f,pitch_deg:%f,yaw_deg:%f\n", roll_deg, pitch_deg, yaw_deg);
 #ifdef GET_LINEAR_ACC_AND_G
@@ -915,9 +930,9 @@ void dmp_get_data(ps_point point)
 #endif // GET_LINEAR_ACC_AND_G
         }
         if (sensors & INV_XYZ_ACCEL) {
-            aacx = -accel[0];
-            aacy = -accel[1];
-            aacz = -accel[2];
+            aacx = accel[0];
+            aacy = accel[1];
+            aacz = accel[2];
 
             Gx = (float)aacx / A_RANGE_NUM;
             Gy = (float)aacy / A_RANGE_NUM;
@@ -929,7 +944,7 @@ void dmp_get_data(ps_point point)
             point->acc[0] = ax;
             point->acc[1] = ay;
             point->acc[2] = az;
-            printf("acceleration with G: ax:%f,ay:%f,az:%f\n", ax, ay, az);
+            //printf("acceleration with G: ax:%f,ay:%f,az:%f\n", ax, ay, az);
 #ifdef GET_LINEAR_ACC_AND_G
             vector3D linearAcc;
             linearAcc.x = ax;
@@ -939,19 +954,19 @@ void dmp_get_data(ps_point point)
             point->linear_acc[0] = acc_result.x;
             point->linear_acc[1] = acc_result.y;
             point->linear_acc[2] = acc_result.z;
-            printf("acceleration without G: %f, %f, %f\n", acc_result.x, acc_result.y, acc_result.z);
-            // printf("Gravity Acceleration: (%f, %f, %f)\n", acc_result.Gx, acc_result.Gy, acc_result.Gz);
+            printf("dmp acceleration without G: %f, %f, %f\n", acc_result.x, acc_result.y, acc_result.z);
+             printf("dmp Gravity Acceleration: (%f, %f, %f)\n", acc_result.Gx, acc_result.Gy, acc_result.Gz);
 #endif // GET_LINEAR_ACC_AND_G
 
 #ifdef GET_RAW_INFO
             res = MPU_Get_Accelerometer(&rax, &ray, &raz);
             if (res != 0)
                 printf("Error getting raw accelerometer\n");
-            printf("raw acc:%d, %d, %d\n", rax, ray, raz);
+            //printf("raw acc:%d, %d, %d\n", rax, ray, raz);
             res = MPU_Get_Gyroscope(&rgx, &rgy, &rgz);
             if (res != 0)
                 printf("Error getting raw gyro\n");
-            printf("raw gyro:%d, %d, %d\n", rgx, rgy, rgz);
+            //printf("raw gyro:%d, %d, %d\n", rgx, rgy, rgz);
             // res = MPU_Get_Magnetometer(&rmx, &rmy, &rmz);
             // if (res != 0)
             //     printf("Error getting raw magnet\n");

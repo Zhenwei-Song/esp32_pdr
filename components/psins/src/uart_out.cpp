@@ -23,9 +23,13 @@ void Data_updata(void)
     out_data.Gyro[1] = (float)mpu_Data_value.Gyro[1];
     out_data.Gyro[2] = (float)mpu_Data_value.Gyro[2];
 
-    out_data.Accel[0] = (float)(mpu_Data_value.Accel[0] * (double)9.8);
-    out_data.Accel[1] = (float)(mpu_Data_value.Accel[1] * (double)9.8);
-    out_data.Accel[2] = (float)(mpu_Data_value.Accel[2] * (double)9.8);
+    // out_data.Accel[0] = (float)(mpu_Data_value.Accel[0] * (double)9.8);
+    // out_data.Accel[1] = (float)(mpu_Data_value.Accel[1] * (double)9.8);
+    // out_data.Accel[2] = (float)(mpu_Data_value.Accel[2] * (double)9.8);
+
+    out_data.Accel[0] = (float)(mpu_Data_value.Accel[0] * (double)glv.g0);
+    out_data.Accel[1] = (float)(mpu_Data_value.Accel[1] * (double)glv.g0);
+    out_data.Accel[2] = (float)(mpu_Data_value.Accel[2] * (double)glv.g0);
 
     out_data.Magn[0] = (float)mpu_Data_value.Mag[0];
     out_data.Magn[1] = (float)mpu_Data_value.Mag[1];

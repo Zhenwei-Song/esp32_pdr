@@ -13,8 +13,13 @@
 #include "psins.h"
 #include "./../../../main/main.h"
 
-#define FRQ	FRQ100
+// #define FRQ	FRQ100
+// #define TS	(1.0/FRQ)
+
+#define FRQ SAMPLE_RATE
 #define TS	(1.0/FRQ)
+
+extern float my_v[3];
 
 class CKFApp:public CSINSGNSS
 {

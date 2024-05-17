@@ -12,12 +12,12 @@
 #ifdef DOWN_SAMPLING
 void down_sampling(short *gx, short *gy, short *gz, short *ax, short *ay, short *az, short *mx, short *my, short *mz)
 {
-    float temp_gyr[3];
-    float temp_acc[3];
-    float temp_mag[3];
-    static float sum_gyr[3];
-    static float sum_acc[3];
-    static float sum_mag[3];
+    short temp_gyr[3];
+    short temp_acc[3];
+    short temp_mag[3];
+    static short sum_gyr[3];
+    static short sum_acc[3];
+    static short sum_mag[3];
     for (int i = 0; i < DOWNSAMPLE_FACTOR; i++) {
         RAW_MPU_Get_Gyroscope(&temp_gyr[0], &temp_gyr[1], &temp_gyr[2]);     // 读取角速度原始数据
         RAW_MPU_Get_Accelerometer(&temp_acc[0], &temp_acc[1], &temp_acc[2]); // 读取角加速度原始数据
