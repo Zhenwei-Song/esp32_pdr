@@ -16,7 +16,10 @@
 			"range.h": "c",
 			"mpu9250_raw.h": "c",
 			"que2mat.h": "c",
-			"*.cpp__": "c"
+			"*.cpp__": "c",
+			"shift_window.h": "c",
+			"stdio.h": "c",
+			"band_pass_filter.h": "c"
 		}
 	}
 }

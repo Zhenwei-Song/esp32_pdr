@@ -20,6 +20,8 @@ Date: 17/02/2015, 19/07/2017, 11/12/2018, 27/12/2019, 12/12/2020, 22/11/2021, 17
 #pragma pack(4)
 
 extern float temp_out_data[11];
+extern bool zupt_final_flag;
+extern float pdr_length[3];
 
 /************** compiling control !!! ***************/
 //#define PSINS_MATRIX_MAX_DIM	46
@@ -53,7 +55,7 @@ extern float temp_out_data[11];
 
 // type re-define
 #ifndef BOOL
-typedef int		BOOL;
+    typedef int BOOL;
 #endif
 
 #ifndef BYTE
@@ -810,6 +812,9 @@ public:
 	CEarth(double a0=glv.Re, double f0=glv.f, double g0=glv.g0);
 	void Update(const CVect3 &pos, const CVect3 &vn=O31, int isMemsgrade=0);
 	CVect3 vn2dpos(const CVect3 &vn, double ts=1.0) const;
+	#if 1 //PDR
+    CVect3 pdr2dpos(const CVect3 &length) const;
+#endif
 	void vn2dpos(CVect3 &dpos, const CVect3 &vn, double ts) const;
 };
 

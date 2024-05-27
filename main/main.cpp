@@ -2,7 +2,7 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-03-25 15:36:20
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-05-13 12:01:37
+ * @LastEditTime: 2024-05-23 19:27:59
  * @FilePath: \esp32_positioning\main\main.cpp
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
@@ -23,6 +23,8 @@
  * 姿态解析可采用DMP（无磁力信息）、PSINS中解析，以及简化版捷联惯导sfann_sins(未验证)
  * psins可以使用串口上传数据，由电脑端运行psins进行解析
  *坐标广研院：23.305836,113.572256，59
+ *添加了zupt(效果差)
+ *添加了PDR(效果好)
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
  */
@@ -69,6 +71,9 @@
 #include "my_uart.h"
 #endif
 #endif // USING_PSINS
+
+#include "./../components/band_pass_filter/inc/band_pass_filter.h"
+#include "./../components/shift_window/inc/shift_window.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -135,37 +140,55 @@ extern "C" void app_main(void)
 
     psins_uart_init();
 /* -------------------------------------------------------------------------- */
-/*                             初始校准+SINSGNSS截取SINS                            */
+/*                             初始校准+卡尔曼滤波                            */
 /* -------------------------------------------------------------------------- */
-#if 0
+#if 1
     bool align_ok = false;
-    bool gyro_zero_bias_cal_ok = false;
+    bool zero_bias_cal_ok = false;
     int bias_count = 0;
+    CVect3 db = O31;
+    CVect3 eb = O31;
+
+    CVect3 v_temp = O31;
+    CVect3 w_temp = O31;
+    CVect3 wm = O31;
+    CVect3 vm = O31;
     float temp_gyro_bias[3] = {0};
     float temp_acc_bias[3] = {0};
 
-    float temp_acc_without_g[3] = {0};
-    float temp_pitch;
-    float temp_roll;
-
-    float my_vm[3] = {0};
-
-    // int time_counter = 100;
-
+    double yaw0 = C360CC180(0 * glv.deg); // 北偏东为正
     CVect3 pos0 = LLH(LATITUDE, LONGITUDE, ALTITUDE);
     CAligni0 align(pos0);
     CKFApp kf(my_TS);
-    // CKFApp kf_temp(my_TS);
-    bool kf_temp_initialized = false;
-    bool acc_zero_bias_cal_ok = false;
-    double yaw0 = C360CC180(0 * glv.deg); // 北偏东为正
-    // kf.Init(CSINS(a2qua(CVect3(0, 0, yaw0)), O31, gpspos)); // 请正确初始化方位和位置
-    CVect3 db = O31;
-    CVect3 eb = O31;
-    // vector3D linearAcc = {0, 0, 0};
-    // vector3D gravity = {0.0, 0.0, -(float)glv.g0};
-    // eulerAngles angles = {0, 0, 0};
-    // vector3D_G acc_result;
+
+    bool zupt_f_flag = false;
+    bool zupt_w_flag = false;
+    bool zupt_f_var_flag = false;
+    int zupt_count = 0;
+
+    float pdr_f_ave = 0;
+    float pdr_f_final = 0;
+    float pdr_filtered_signal = 0;
+    float pdr_last_step_time = 0;
+    float pdr_current_step_time = 0;
+    float pdr_length_n = 0;
+    float pdr_length_e = 0;
+    float pdr_ay_max = 0; // 用于步长估计
+    float pdr_ay_min = 0;
+    bool pdr_after_first_step = false;
+    float pdr_step_len_estimated = 0;
+    int pdr_error_jump = 0;
+    unsigned int pdr_count = 0;
+
+    // 初始化带通滤波器
+    band_pass_filter_s filter;
+    init_band_pass_filter(&filter, 1.0, 0.5, SAMPLE_RATE); // 参数由人体步态特征给出
+
+    float f_m2 = 0;
+    float f_m = 0;
+    float w_m2 = 0;
+    float w_m = 0;
+
     printf("Initalizing!!\n");
     while (1) {
         if (xSemaphoreTake(xCountingSemaphore_data_update, portMAX_DELAY) == pdTRUE) {
@@ -173,134 +196,169 @@ extern "C" void app_main(void)
             // mpu_Data_value.Accel[0] = 0;
             // mpu_Data_value.Accel[1] = 0;
             // mpu_Data_value.Accel[2] = 1;
-            if (gyro_zero_bias_cal_ok == false) {
+            /* -------------------------------------------------------------------------- */
+            /*                                累计测量，求平均值得到零偏                               */
+            /* -------------------------------------------------------------------------- */
+            if (zero_bias_cal_ok == false) {
                 for (int i = 0; i < 3; i++) {
                     temp_gyro_bias[i] = temp_gyro_bias[i] + mpu_Data_value.Gyro[i];
                     // temp_acc_bias[i] = temp_acc_bias[i] + mpu_Data_value.Accel[i];
                 }
-                // temp_roll = atan2(mpu_Data_value.Accel[1], mpu_Data_value.Accel[2]);
-                // temp_pitch = -atan2(mpu_Data_value.Accel[0], sqrt(mpu_Data_value.Accel[1] * mpu_Data_value.Accel[1] + mpu_Data_value.Accel[2] * mpu_Data_value.Accel[2]));
-                // temp_acc_without_g[0] = mpu_Data_value.Accel[1] - sin(temp_roll) * cos(temp_pitch);
-                // temp_acc_without_g[1] = mpu_Data_value.Accel[2] - cos(temp_roll) * cos(temp_pitch);
-                // temp_acc_without_g[2] = mpu_Data_value.Accel[0] + sin(temp_pitch);
-                // printf("temp roll pitch: (%f, %f)\n", temp_roll, temp_pitch);
-                // printf("temp_acc_without_g: (%f, %f, %f)\n", temp_acc_without_g[0], temp_acc_without_g[1], temp_acc_without_g[2]);
-                // printf("temp_acc_g: (%f, %f, %f)\n", sin(temp_roll) * cos(temp_pitch) * glv.g0, cos(temp_roll) * cos(temp_pitch) * glv.g0, -sin(temp_pitch) * glv.g0);
                 temp_acc_bias[0] = temp_acc_bias[0] + mpu_Data_value.Accel[0];
                 temp_acc_bias[1] = temp_acc_bias[1] + mpu_Data_value.Accel[1];
                 temp_acc_bias[2] = temp_acc_bias[2] + (mpu_Data_value.Accel[2] - 1);
-                // temp_acc_bias[0] = temp_acc_bias[0] + temp_acc_without_g[0];
-                // temp_acc_bias[1] = temp_acc_bias[1] + temp_acc_without_g[1];
-                // temp_acc_bias[2] = temp_acc_bias[2] + temp_acc_without_g[2];
                 bias_count = bias_count + 1;
-                if (OUT_cnt > ZERO_BIAS_CAL_TIME) {
-                    gyro_zero_bias_cal_ok = true;
+                if (OUT_cnt > ZERO_BIAS_CAL_TIME + WAIT_TIME) {
+                    zero_bias_cal_ok = true;
                     for (int i = 0; i < 3; i++) {
                         temp_gyro_bias[i] = temp_gyro_bias[i] / bias_count;
                         temp_acc_bias[i] = temp_acc_bias[i] / bias_count;
                         printf("temp_gyro_bias[%d] %f\n", i, temp_gyro_bias[i]);
                         printf("temp_acc_bias[%d] %f \n", i, temp_acc_bias[i]);
                     }
-                    eb = CVect3(temp_gyro_bias[0], temp_gyro_bias[1], temp_gyro_bias[2]) * glv.dps; // 陀螺零偏 deg/s
-                    db = CVect3(temp_acc_bias[0], temp_acc_bias[1], temp_acc_bias[2]) * glv.g0;
+                    eb = CVect3(temp_gyro_bias[0], temp_gyro_bias[1], temp_gyro_bias[2]); // 陀螺零偏 deg/s
+                    db = CVect3(temp_acc_bias[0], temp_acc_bias[1], temp_acc_bias[2]);
                     printf("Finish calculating bias!!\n");
                 }
             }
             else {
-                // if (acc_zero_bias_cal_ok == false) {
-                //     CVect3 wm_temp = (*(CVect3 *)mpu_Data_value.Gyro * glv.dps - eb) * my_TS;
-                //     CVect3 vm_temp = (*(CVect3 *)mpu_Data_value.Accel * glv.g0 - db) * my_TS;
-                //     if (kf_temp_initialized == false) {
-                //         kf.Init(CSINS(a2qua(CVect3(0, 0, yaw0)), O31, pos0));
-                //         kf_temp_initialized = true;
-                //         temp_acc_bias[0] = 0;
-                //         temp_acc_bias[1] = 0;
-                //         temp_acc_bias[2] = 0;
-                //     }
-                //     else {
-                //         kf.Update(&wm_temp, &vm_temp, 1, my_TS, 5);
-                //         printf("kf_temp.sins.att: %f,%f,%f\n", kf.sins.att.i / DEG, kf.sins.att.j / DEG, kf.sins.att.k / DEG);
-                //         linearAcc.x = mpu_Data_value.Accel[0] * glv.g0;
-                //         linearAcc.y = mpu_Data_value.Accel[1] * glv.g0;
-                //         linearAcc.z = mpu_Data_value.Accel[2] * glv.g0;
-                //         angles.pitch = kf.sins.att.i / DEG;
-                //         angles.roll = kf.sins.att.j / DEG;
-                //         angles.yaw = kf.sins.att.k / DEG;
-                //         vector3D_G acc_result = get_acc_without_g(linearAcc, gravity, angles);
-                //         printf("acceleration without G: %f, %f, %f\n", acc_result.x / glv.g0, acc_result.y / glv.g0, acc_result.z / glv.g0);
-                //         printf("Gravity Acceleration: (%f, %f, %f)\n", acc_result.Gx / glv.g0, acc_result.Gy / glv.g0, acc_result.Gz / glv.g0);
-                //         temp_acc_bias[0] = temp_acc_bias[0] + (mpu_Data_value.Accel[0] - 1 * acc_result.x / glv.g0);
-                //         temp_acc_bias[1] = temp_acc_bias[1] + (mpu_Data_value.Accel[1] - 1 * acc_result.y / glv.g0);
-                //         temp_acc_bias[2] = temp_acc_bias[2] + (mpu_Data_value.Accel[2] - 1 * acc_result.z / glv.g0);
-                //         printf("temp_acc_bias_adjusted %f, %f, %f \n", temp_acc_bias[0], temp_acc_bias[1], temp_acc_bias[2]);
-                //         acc_zero_bias_cal_ok = true;
+                w_temp = (*(CVect3 *)mpu_Data_value.Gyro - eb) * glv.dps;
+                v_temp = (*(CVect3 *)mpu_Data_value.Accel - db) * glv.g0;
+                wm = w_temp * my_TS;
+                vm = v_temp * my_TS;
+                // CVect3 vm = (*(CVect3 *)mpu_Data_value.Accel * glv.g0) * my_TS;
+#if 0
+                /* -------------------------------------------------------------------------- */
+                /*                                    ZUPT                                    */
+                /* -------------------------------------------------------------------------- */
+                w_m2 = w_temp.i * w_temp.i + w_temp.j * w_temp.j + w_temp.k * w_temp.k;
+                f_m2 = v_temp.i * v_temp.i + v_temp.j * v_temp.j + v_temp.k * v_temp.k;
+
+                f_m = sqrt(f_m2); // 比力模值
+                w_m = sqrt(w_m2); // 角速度模值
+                // printf("zupt f:%f w:%f\n", f_m, w_m);
+
+                zupt_shift_window(v_temp.i, v_temp.j, v_temp.k);
+                zupt_f_var_flag = check_zupt_f_window_state(zupt_f_window_x, zupt_f_window_y, zupt_f_window_z, ZUPT_F_WINDOW_SIZE);
+                if (f_m >= ZUPT_F_MIN && f_m <= ZUPT_F_MAX) {
+                    zupt_f_flag = true;
+                    // printf("zupt f true!!\n");
+                    if (w_m <= ZUPT_W_THESH) {
+                        zupt_w_flag = true;
+                        // printf("zupt w true!!\n");
+                        if (zupt_f_flag == true && zupt_w_flag == true && zupt_f_var_flag == true && align_ok == true) {
+                            zupt_final_flag = true;
+                            zupt_f_flag = false;
+                            zupt_w_flag = false;
+                            zupt_f_var_flag = false;
+                            zupt_count = zupt_count + 1;
+                            printf("main zupt  %d !!\n", zupt_count);
+                            kf.SetMeasGNSS(O31, CVect3(0, 0, 0.00001));
+                        }
+                    }
+                }
+
+                                if (align_ok == false) // 静态校准
+                {
+                    align.Update(&wm, &vm, 1, my_TS, O31);
+                    if (OUT_cnt > (ALIGN_TIME + ZERO_BIAS_CAL_TIME + WAIT_TIME)) {
+                        align_ok = true;
+                        kf.Init(CSINS(a2qua(CVect3(0, 0, yaw0)), O31, pos0)); // 请正确初始化方位和位置
+                        printf("Finish Aligning!!\n");
+                    }
+                }
+                else // 后续更新
+                {
+                    kf.Update(&wm, &vm, 1, my_TS, 1);
+                    AVPUartOut(kf);
+                }
+
+#else
+                /* -------------------------------------------------------------------------- */
+                /*                                     PDR                                    */
+                /* -------------------------------------------------------------------------- */
+                w_m2 = w_temp.i * w_temp.i + w_temp.j * w_temp.j + w_temp.k * w_temp.k;
+                f_m2 = v_temp.i * v_temp.i + v_temp.j * v_temp.j + v_temp.k * v_temp.k;
+
+                f_m = sqrt(f_m2); // 比力模值
+                w_m = sqrt(w_m2); // 角速度模值
+
+                if (align_ok == false) // 静态校准
+                {
+                    align.Update(&wm, &vm, 1, my_TS, O31);
+                    if (OUT_cnt > (ALIGN_TIME + ZERO_BIAS_CAL_TIME + WAIT_TIME)) {
+                        align_ok = true;
+                        kf.Init(CSINS(a2qua(CVect3(0, 0, yaw0)), O31, pos0)); // 请正确初始化方位和位置
+                        printf("Finish Aligning!!\n");
+                    }
+                }
+                else // 后续更新
+                {
+                    kf.Update(&wm, &vm, 1, my_TS, 1);
+                    // AVPUartOut(kf);
+                }
+
+                if (align_ok == true) {
+                    pdr_count = pdr_count + 1;
+                    pdr_f_ave = (pdr_f_ave + f_m) / pdr_count; // 整个运动过程的平均加速度矢量
+                    pdr_f_final = f_m - pdr_f_ave;             // 步数检测信号(消除人体运动过程中摆动及重力加速度带来的影响)
+                    pdr_filtered_signal = process_step_detection(pdr_f_final, &filter);
+                    if (pdr_after_first_step == true) {
+                        if (pdr_ay_max < v_temp.j) // 获得单步y轴最大加速度
+                            pdr_ay_max = v_temp.j;
+                        if (pdr_ay_min > v_temp.j) // 获得单步y轴最小加速度
+                            pdr_ay_min = v_temp.j;
+                    }
+
+                    if (pdr_filtered_signal > 0.55 && vm.k < 0.2) {
+                        pdr_current_step_time = OUT_cnt;
+                        if (pdr_current_step_time - pdr_last_step_time > 450) { // 0.45s
+                            // printf("sinal before: %f, pdr_filtered:%f\n", pdr_f_final, pdr_filtered_signal);
+                            // kf.SetMeasGNSS(O31, CVect3(0, 0, 0.00001));
+                            if (pdr_error_jump >= 2) { // 开机后会误测两次
+                                if (pdr_after_first_step == false) {
+                                    pdr_length_e = PDR_STEP_LENGTH * sin(CC180C360(kf.sins.att.k)); // 应该先进性kf.Update更新姿态角
+                                    pdr_length_n = PDR_STEP_LENGTH * cos(CC180C360(kf.sins.att.k)); // 应该先进性kf.Update更新姿态角
+                                    pdr_after_first_step = true;
+                                }
+                                else { // 步长估计
+                                    pdr_step_len_estimated = PDR_STEP_K * pow((pdr_ay_max - pdr_ay_min), 0.25);
+                                    printf("pdr_step_len_estimated: %f\n", pdr_step_len_estimated);
+                                    pdr_length_e = pdr_step_len_estimated * sin(CC180C360(kf.sins.att.k)); // 应该先进性kf.Update更新姿态角
+                                    pdr_length_n = pdr_step_len_estimated * cos(CC180C360(kf.sins.att.k)); // 应该先进性kf.Update更新姿态角
+                                    pdr_ay_max = pdr_ay_min = 0;
+                                }
+                                pdr_length[0] = pdr_length_e;
+                                pdr_length[1] = pdr_length_n;
+                            }
+                            else {
+                                pdr_error_jump = pdr_error_jump + 1;
+                            }
+                            // printf("yaw: %f\n", CC180C360(kf.sins.att.k) / DEG);
+                            // printf("pdr_length_n: %f, pdr_length_e:%f\n", pdr_length_n, pdr_length_e);
+                            printf("pdr start!\n");
+                            pdr_last_step_time = pdr_current_step_time;
+                        }
+                    }
+                    AVPUartOut(kf);
+                    pdr_length_e = pdr_length_n = 0;
+                }
+#endif
+
+                // if (align_ok == false) // 静态校准
+                // {
+                //     align.Update(&wm, &vm, 1, my_TS, O31);
+                //     if (OUT_cnt > (ALIGN_TIME + ZERO_BIAS_CAL_TIME + WAIT_TIME)) {
+                //         align_ok = true;
+                //         kf.Init(CSINS(a2qua(CVect3(0, 0, yaw0)), O31, pos0)); // 请正确初始化方位和位置
+                //         printf("Finish Aligning!!\n");
                 //     }
                 // }
-                if (0) {
-                }
-                else {
-                    // linearAcc.x = mpu_Data_value.Accel[0] * glv.g0;
-                    // linearAcc.y = mpu_Data_value.Accel[1] * glv.g0;
-                    // linearAcc.z = mpu_Data_value.Accel[2] * glv.g0;
-                    // angles.pitch = (kf.sins.att.i / DEG);
-                    // angles.roll = (kf.sins.att.j / DEG);
-                    // angles.yaw = (kf.sins.att.k / DEG);
-                    // acc_result = get_acc_without_g(linearAcc, gravity, angles);
-                    // printf("acceleration without G: %f, %f, %f\n", acc_result.x, acc_result.y, acc_result.z);
-                    // printf("Gravity Acceleration: (%f, %f, %f)\n", acc_result.Gx, acc_result.Gy, acc_result.Gz);
-                    // printf("Gravity Acceleration 2: (%f, %f, %f)\n", acc_result.Gx / glv.g0, acc_result.Gy / glv.g0, acc_result.Gz / glv.g0);
-                    // db = CVect3((acc_result.Gx / glv.g0), (acc_result.Gy / glv.g0), (acc_result.Gz / glv.g0)) * glv.g0;
-
-                    // temp_roll = atan2(mpu_Data_value.Accel[1], mpu_Data_value.Accel[2]);
-                    // temp_pitch = -atan2(mpu_Data_value.Accel[0], sqrt(mpu_Data_value.Accel[1] * mpu_Data_value.Accel[1] + mpu_Data_value.Accel[2] * mpu_Data_value.Accel[2]));
-                    // temp_acc_without_g[0] = mpu_Data_value.Accel[1] * glv.g0 - sin(temp_roll) * cos(temp_pitch) * glv.g0;
-                    // temp_acc_without_g[1] = mpu_Data_value.Accel[2] * glv.g0 - cos(temp_roll) * cos(temp_pitch) * glv.g0;
-                    // temp_acc_without_g[2] = mpu_Data_value.Accel[0] * glv.g0 + sin(temp_pitch) * glv.g0;
-                    // printf("temp_acc_without_g: (%f, %f, %f)\n", temp_acc_without_g[0], temp_acc_without_g[1], temp_acc_without_g[2]);
-                    // //printf("temp_acc_g: (%f, %f, %f)\n", sin(temp_roll) * cos(temp_pitch) * glv.g0, cos(temp_roll) * cos(temp_pitch) * glv.g0, -sin(temp_pitch) * glv.g0);
-                    CVect3 wm = (*(CVect3 *)mpu_Data_value.Gyro * glv.dps - eb) * my_TS;
-                    CVect3 vm = (*(CVect3 *)mpu_Data_value.Accel * glv.g0 - db) * my_TS;
-                    // CVect3 vm = (*(CVect3 *)mpu_Data_value.Accel * glv.g0) * my_TS;
-                    //  printf("my_v: (%f,%f,%f)\n", mpu_Data_value.Accel[0] * my_TS * glv.g0, mpu_Data_value.Accel[1] * my_TS * glv.g0, mpu_Data_value.Accel[2] * my_TS * glv.g0);
-                    //   kf.Update(&wm, &vm, 1, my_TS, 5);
-                    //   AVPUartOut(kf);
-
-                    if (align_ok == false) {
-                        align.Update(&wm, &vm, 1, my_TS, O31);
-                        if (OUT_cnt > (ALIGN_TIME + ZERO_BIAS_CAL_TIME)) {
-                            align_ok = true;
-                            kf.Init(CSINS(a2qua(CVect3(0, 0, yaw0)), O31, pos0)); // 请正确初始化方位和位置
-                            printf("Finish Aligning!!\n");
-                        }
-                    }
-                    else {
-                        kf.Update(&wm, &vm, 1, my_TS, 5);
-#if 0
-                        for (int i = 0; i < 3; i++) {
-                            // my_vm[i] = (mpu_Data_value.Accel[i] * glv.g0 - temp_acc_bias[i] * glv.g0) * my_TS;
-                            // my_vm[i] = (mpu_Data_value.Accel[i] * glv.g0) * my_TS;
-                            my_v[i] = my_v[i] + my_vm[i];
-                        }
-                        my_vm[0] = (mpu_Data_value.Accel[0] * glv.g0 - temp_acc_bias[0] * glv.g0) * my_TS;
-                        my_vm[1] = (mpu_Data_value.Accel[1] * glv.g0 - temp_acc_bias[1] * glv.g0) * my_TS;
-                        my_vm[2] = (mpu_Data_value.Accel[2] * glv.g0 - (temp_acc_bias[2] + 1) * glv.g0) * my_TS;
-                        // printf("my_vm: (%f,%f,%f)\n", my_vm[0], my_vm[1], my_vm[2]);
-                        printf("my_v: (%f,%f,%f)\n", my_v[0], my_v[1], my_v[2]);
-#endif
-                        // linearAcc.x = mpu_Data_value.Accel[0] * glv.g0;
-                        // linearAcc.y = mpu_Data_value.Accel[1] * glv.g0;
-                        // linearAcc.z = mpu_Data_value.Accel[2] * glv.g0;
-                        // angles.pitch = (kf.sins.att.i / DEG);
-                        // angles.roll = (kf.sins.att.j / DEG);
-                        // angles.yaw = (kf.sins.att.k / DEG);
-                        // acc_result = get_acc_without_g(linearAcc, gravity, angles);
-                        // printf("acceleration without G: %f, %f, %f\n", acc_result.x, acc_result.y, acc_result.z);
-                        // printf("Gravity Acceleration: (%f, %f, %f)\n", acc_result.Gx, acc_result.Gy, acc_result.Gz);
-                        // printf("Gravity Acceleration 2: (%f, %f, %f)\n", acc_result.Gx / glv.g0, acc_result.Gy / glv.g0, acc_result.Gz / glv.g0);
-
-                        AVPUartOut(kf);
-                    }
-                }
+                // else // 后续更新
+                // {
+                //     kf.Update(&wm, &vm, 1, my_TS, 1);
+                //     AVPUartOut(kf);
+                // }
             }
 
 #ifdef USING_DMP
@@ -321,8 +379,11 @@ extern "C" void app_main(void)
     float temp_acc_bias[3] = {0};
     double yaw0 = C360CC180(0 * glv.deg); // 北偏东为正
     CVect3 pos0 = LLH(LATITUDE, LONGITUDE, ALTITUDE);
-    CVect3 wm = O31;
     CVect3 v00 = O31;
+
+    CVect3 v_temp = O31;
+    CVect3 w_temp = O31;
+    CVect3 wm = O31;
     CVect3 vm = O31;
     CVect3 db = O31;
     CVect3 eb = O31;
@@ -334,6 +395,15 @@ extern "C" void app_main(void)
     bool aln_init_OK = false;
     bool zero_bias_cal_ok = false;
     int bias_count = 0;
+
+    // bool zupt_final_flag = false;
+    bool zupt_f_flag = false;
+    bool zupt_w_flag = false;
+    float f_m2 = 0;
+    float f_m = 0;
+    float w_m2 = 0;
+    float w_m = 0;
+
     printf("Initalizing!!\n");
     while (1) {
         if (xSemaphoreTake(xCountingSemaphore_data_update, portMAX_DELAY) == pdTRUE) {
@@ -370,8 +440,38 @@ extern "C" void app_main(void)
                 }
             }
             else {
-                wm = (*(CVect3 *)mpu_Data_value.Gyro - eb) * glv.dps * my_TS;
-                vm = (*(CVect3 *)mpu_Data_value.Accel - db) * glv.g0 * my_TS;
+                w_temp = (*(CVect3 *)mpu_Data_value.Gyro - eb) * glv.dps;
+                v_temp = (*(CVect3 *)mpu_Data_value.Accel - db) * glv.g0;
+                wm = w_temp * my_TS;
+                vm = v_temp * my_TS;
+
+                /* -------------------------------------------------------------------------- */
+                /*                                    ZUPT                                    */
+                /* -------------------------------------------------------------------------- */
+                // f_m2 = mpu_Data_value.Accel[0] * mpu_Data_value.Accel[0] + mpu_Data_value.Accel[1] * mpu_Data_value.Accel[1] + mpu_Data_value.Accel[2] * mpu_Data_value.Accel[2];
+                // w_m2 = mpu_Data_value.Gyro[0] * mpu_Data_value.Gyro[0] + mpu_Data_value.Gyro[1] * mpu_Data_value.Gyro[1] + mpu_Data_value.Gyro[2] * mpu_Data_value.Gyro[2];
+
+                w_m2 = w_temp.i * w_temp.i + w_temp.j * w_temp.j + w_temp.k * w_temp.k;
+                f_m2 = v_temp.i * v_temp.i + v_temp.j * v_temp.j + v_temp.k * v_temp.k;
+
+                f_m = sqrt(f_m2); // 比力模值
+                w_m = sqrt(w_m2); // 角速度模值
+                // printf("zupt f:%f w:%f\n", f_m, w_m);
+                if (f_m >= ZUPT_F_MIN && f_m <= ZUPT_F_MAX) {
+                    zupt_f_flag = true;
+                    // printf("zupt f true!!\n");
+                    if (w_m <= ZUPT_W_THESH) {
+                        zupt_w_flag = true;
+                        // printf("zupt w true!!\n");
+                        if (zupt_f_flag == true && zupt_w_flag == true && alnOK == true) {
+                            zupt_final_flag = true;
+                            zupt_f_flag = false;
+                            zupt_w_flag = false;
+                            // printf("zupt!!\n");
+                        }
+                    }
+                }
+
                 if (alnOK == false) {
                     if (aln_init_OK == false) {
                         aln.Init(sins);

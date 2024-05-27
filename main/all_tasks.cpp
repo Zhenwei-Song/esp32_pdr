@@ -329,8 +329,6 @@ void push_raw_data(void *pvParameters)
                 mpu_Data_value.Gyro[i] = (double)mpu_AD_value.Gyro[i] / (double)131.072;
                 // mpu_Data_value.Mag[i] = mpu_AD_value.Mag[i] * (double)0.25 * ((double)1 + ((double)mag_sensitivity[i] - (double)128) / (double)256);
                 // mpu_Data_value.Temp = ((double)mpu_AD_value.Temp / (double)333.87) + (double)21;
-                //  printf("mpu_Data_value.Gyro:%f %f %f\n\n",
-                //         mpu_Data_value.Gyro[0], mpu_Data_value.Gyro[1], mpu_Data_value.Gyro[2]); // 源数据串口输出
             }
 
 #ifdef YAW_INIT

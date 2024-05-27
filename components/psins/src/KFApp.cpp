@@ -2,7 +2,7 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-03-14 10:31:11
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-05-09 18:44:25
+ * @LastEditTime: 2024-05-23 18:47:05
  * @FilePath: \esp32_positioning\components\psins\src\KFApp.cpp
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
@@ -23,6 +23,7 @@ CKFApp::CKFApp(double ts) : CSINSGNSS(19, 6, ts)
 
 void CKFApp::Init(const CSINS &sins0, int grade)
 {
+#if 0
     CSINSGNSS::Init(sins0);
     Pmax.Set2(fPHI(600, 600), fXXX(500), fdPOS(1e6), fDPH3(5000), fMG3(10), fXXX(10), 0.1);
     Pmin.Set2(fPHI(0.1, 1.0), fXXX(0.001), fdPOS(0.1), fDPH3(0.1), fUG3(10), fXXX(0.01), 0.0001);
@@ -33,6 +34,30 @@ void CKFApp::Init(const CSINS &sins0, int grade)
     Rmin = Rt * 0.01;
     Rb = 0.6;
     FBTau.Set(fXX9(0.1), fXX6(1.0), fINF3, INF);
+#elif 0 // 使得卡尔曼滤波更信任速度的量测值
+    CSINSGNSS::Init(sins0);
+    Pmax.Set2(fPHI(600, 600), fXXX(500), fdPOS(1e6), fDPH3(5000), fMG3(10), fXXX(10), 0.1);
+    Pmin.Set2(fPHI(0.1, 1.0), fXXX(0.001), fdPOS(0.1), fDPH3(0.1), fUG3(10), fXXX(0.01), 0.0001);
+    Pk.SetDiag2(fPHI(60, 600), fXXX(0.1), fdPOS(10.0), fDPH3(100), fMG3(3.0), fXXX(0.001), 0.01);
+    Qt.Set2(fDPSH3(1.0), fUGPSHZ3(5.0), fOOO, fOO6, fOOO, 0.0);
+    Rt.Set2(fXXZ(0.001, 0.002), fdLLH(0.1, 0.3));
+    Rmax = Rt * 100;
+    Rmin = Rt * 0.01;
+    Rb = 0.06;                                      // 调小使得滤波器更敏感，反应更快
+    FBTau.Set(fXX9(0.005), fXX6(0.01), fINF3, INF); // 减小反馈时间常数，使响应更快
+#else //更激进
+    CSINSGNSS::Init(sins0);
+    Pmax.Set2(fPHI(600, 600), fXXX(500), fdPOS(1e6), fDPH3(5000), fMG3(10), fXXX(10), 0.1);
+    Pmin.Set2(fPHI(0.1, 1.0), fXXX(0.001), fdPOS(0.1), fDPH3(0.1), fUG3(10), fXXX(0.01), 0.0001);
+    Pk.SetDiag2(fPHI(60, 600), fXXX(0.001), fdPOS(10.0), fDPH3(100), fMG3(3.0), fXXX(0.001), 0.01);
+    Qt.Set2(fDPSH3(10.0), fUGPSHZ3(20.0), fOOO, fOO6, fOOO, 0.0);
+    Rt.Set2(fXXZ(0.0001, 0.0002), fdLLH(0.01, 0.03));
+    Rmax = Rt * 100;
+    Rmin = Rt * 0.01;
+    Rb = 0.05;
+    FBTau.Set(fXX9(0.005), fXX6(0.01), fINF3, INF);
+
+#endif
 }
 
 void AVPUartOut(const CKFApp &kf)
@@ -43,29 +68,29 @@ void AVPUartOut(const CKFApp &kf)
 
 void AVPUartOut(const CVect3 &att, const CVect3 &vn, const CVect3 &pos)
 {
-    // out_data.Att[0] = att.i / DEG;
-    // out_data.Att[1] = att.j / DEG;
-    // out_data.Att[2] = CC180C360(att.k) / DEG;
+#if 1
+    /* -------------------------------------------------------------------------- */
+    /*                                    卡尔曼滤波                                   */
+    /* -------------------------------------------------------------------------- */
+    out_data.Att[0] = att.i / DEG;
+    out_data.Att[1] = att.j / DEG;
+    out_data.Att[2] = CC180C360(att.k) / DEG;
 
-    // out_data.Vn[0] = vn.i;
-    // out_data.Vn[1] = vn.j;
-    // out_data.Vn[2] = vn.k;
-    // int deg;
-    // deg = (int)(pos.j / DEG);
-    // out_data.Pos[0] = deg;
-    // out_data.Pos[1] = pos.j / DEG - deg;
-    // deg = (int)(pos.i / DEG);
-    // out_data.Pos[2] = deg;
-    // out_data.Pos[3] = pos.i / DEG - deg;
-    // out_data.Pos[4] = pos.k;
-
-    // out_data.Vn[0] = my_v[0];
-    // out_data.Vn[1] = my_v[1];
-    // out_data.Vn[2] = my_v[2];
-    out_data.GPS_Vn[0] = my_v[0];
-    out_data.GPS_Vn[1] = my_v[1];
-    out_data.GPS_Vn[2] = my_v[2];
-
+    out_data.Vn[0] = vn.i;
+    out_data.Vn[1] = vn.j;
+    out_data.Vn[2] = vn.k;
+    int deg;
+    deg = (int)(pos.j / DEG);
+    out_data.Pos[0] = deg;
+    out_data.Pos[1] = pos.j / DEG - deg;
+    deg = (int)(pos.i / DEG);
+    out_data.Pos[2] = deg;
+    out_data.Pos[3] = pos.i / DEG - deg;
+    out_data.Pos[4] = pos.k;
+#else
+    /* -------------------------------------------------------------------------- */
+    /*                                    sins                                    */
+    /* -------------------------------------------------------------------------- */
     out_data.Att[0] = temp_out_data[8];
     out_data.Att[1] = temp_out_data[9];
     out_data.Att[2] = temp_out_data[10];
@@ -77,7 +102,7 @@ void AVPUartOut(const CVect3 &att, const CVect3 &vn, const CVect3 &pos)
     out_data.Pos[2] = temp_out_data[5];
     out_data.Pos[3] = temp_out_data[6];
     out_data.Pos[4] = temp_out_data[7];
-
+#endif
     // printf("out accel: %f,%f,%f\n", out_data.Accel[0], out_data.Accel[1], out_data.Accel[2]);
     // printf("out Gyro: %f,%f,%f\n", out_data.Gyro[0], out_data.Gyro[1], out_data.Gyro[2]);
     // printf("out Att: %f,%f,%f\n", out_data.Att[0], out_data.Att[1], out_data.Att[2]);

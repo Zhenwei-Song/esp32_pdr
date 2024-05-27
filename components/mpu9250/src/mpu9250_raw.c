@@ -101,7 +101,8 @@ uint8_t MPU_Set_Rate(uint16_t rate)
         rate = 4;
     data = 1000 / rate - 1;
     data = MPU_Write_Byte(MPU9250_ADDR, MPU_SAMPLE_RATE_REG, data); // 设置数字低通滤波器
-    return MPU_Set_LPF(rate / 5);                                   // 自动设置LPF为采样率的一半
+    //return MPU_Set_LPF(rate / 5);                                   // 自动设置LPF为采样率的一半
+    return MPU_Set_LPF(5);
     return 0;
 }
 

@@ -8,15 +8,19 @@ Date: 17/02/2015, 19/07/2017, 11/12/2018, 27/12/2019, 12/12/2020, 22/11/2021, 17
 
 #include "./../inc/psins.h"
 
-#define VN_PROP 0.9995
+#define VN_PROP 0.9993
 // #define VN_PROP 1
 #define V0_PROP (1 - VN_PROP)
 #define AN_PROP (1 / VN_PROP)
-//#define AN_PROP 1
+// #define AN_PROP 1
 
 float temp_out_data[11];
 static CVect3 temp_v0;
 static float temp_v0_adjust[3];
+
+bool zupt_final_flag = false;
+
+float pdr_length[3] = {0};
 
 const CVect3 O31(0.0), One31(1.0), I31Z(0, 0, 1.0), Ipos(1.0 / RE, 1.0 / RE, 1.0), posNWPU = LLH(34.246048, 108.909664, 380); // NWPU-Lab-pos
 const CQuat qI(1.0, 0.0, 0.0, 0.0);
@@ -4448,6 +4452,7 @@ void CSINSGNSS::SetMeasGNSS(const CVect3 &posgnss, const CVect3 &vngnss, double 
     if (!IsZero(vngnss) && avpi.Interp(vnGNSSdelay + dtGNSSdelay, 0x2)) {
         *(CVect3 *)&Zk.dd[0] = avpi.vn - vngnss;
         SetMeasFlag(00007);
+        // printf("measgnss check\n");
     }
     if (!IsZero(yawgnss) && avpi.Interp(yawGNSSdelay + dtGNSSdelay, 0x1)) {
         Zk.dd[yawHkRow] = -diffYaw(avpi.att.k, yawgnss + dyawGNSS);
@@ -5763,6 +5768,13 @@ CVect3 CEarth::vn2dpos(const CVect3 &vn, double ts) const
     return CVect3(vn.j * f_RMh, vn.i * f_clRNh, vn.k) * ts;
 }
 
+#if 1 // PDR
+CVect3 CEarth::pdr2dpos(const CVect3 &length) const
+{
+    return CVect3(length.j * f_RMh, length.i * f_clRNh, length.k);
+}
+#endif
+
 void CEarth::vn2dpos(CVect3 &dpos, const CVect3 &vn, double ts) const
 {
     dpos.i = vn.j * f_RMh * ts, dpos.j = vn.i * f_clRNh * ts, dpos.k = vn.k * ts;
@@ -6288,9 +6300,32 @@ void CSINS::Update(const CVect3 *pwm, const CVect3 *pvm, int nSamples, double ts
         fn = qnb * fb;
         an = fn + eth.gcc;
         anbar = (1 - afabar) * anbar + afabar * an;
-        CVect3 vn1 = temp_v0 + VN_PROP * vn + AN_PROP * an * nts;
+        // printf("csins update check\n");
+#if 0 // 原本
+        CVect3 vn1 = V0_PROP * temp_v0 + VN_PROP * vn + an * nts;
         pos = pos + eth.vn2dpos(vn + vn1, nts2);
         vn = vn1;
+#elif 1//PDR
+        CVect3 pdr_len = CVect3(pdr_length[0], pdr_length[1], pdr_length[2]);
+        pos = pos + eth.pdr2dpos(pdr_len);
+        pdr_length[0] = pdr_length[1] = pdr_length[2] =0;
+#else // zupt尝试
+      // CVect3 vn1 = O31;
+        if (zupt_final_flag == true) {
+            zupt_final_flag = false;
+            CVect3 vn1 = temp_v0 / V0_PROP;
+            pos = pos + eth.vn2dpos(vn + vn1, nts2);
+            vn = vn1;
+            printf("zupt!!\n");
+        }
+        else {
+            CVect3 vn1 = V0_PROP * temp_v0 + VN_PROP * vn + an * nts;
+            pos = pos + eth.vn2dpos(vn + vn1, nts2);
+            vn = vn1;
+        }
+#endif
+        // pos = pos + eth.vn2dpos(vn + vn1, nts2);
+        // vn = vn1;
         qnb = qnb * rv2q(imu.phim);
         Cnb = q2mat(qnb);
         att = m2att(Cnb);
