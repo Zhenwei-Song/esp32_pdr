@@ -1,9 +1,9 @@
 /*
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-05-24 10:23:13
- * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-05-24 10:57:19
- * @FilePath: \esp32_positioning\components\shift_window\src\shift_window.c
+ * @LastEditors: Zhenwei-Song zhenwei.song@qq.com
+ * @LastEditTime: 2024-05-30 08:41:54
+ * @FilePath: \esp32_positioning\esp32_positioning\components\shift_window\src\shift_window.c
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
  */
@@ -14,9 +14,14 @@ float zupt_f_window_y[ZUPT_F_WINDOW_SIZE] = {0};
 float zupt_f_window_z[ZUPT_F_WINDOW_SIZE] = {0};
 
 static int right = 0;
-/* -------------------------------------------------------------------------- */
-/*                                    滑动窗口                                    */
-/* -------------------------------------------------------------------------- */
+
+/**
+ * @description:滑动窗口
+ * @param {float} f_x
+ * @param {float} f_y
+ * @param {float} f_z
+ * @return {*}
+ */
 void zupt_shift_window(float f_x, float f_y, float f_z)
 {
     if (right != (ZUPT_F_WINDOW_SIZE - 1)) { // 初始window还没有填满
@@ -36,9 +41,13 @@ void zupt_shift_window(float f_x, float f_y, float f_z)
         zupt_f_window_z[ZUPT_F_WINDOW_SIZE - 1] = f_z;
     }
 }
-/* -------------------------------------------------------------------------- */
-/*                                   计算窗口内均值                                  */
-/* -------------------------------------------------------------------------- */
+
+/**
+ * @description: 计算窗口内均值
+ * @param {float} *window
+ * @param {int} size
+ * @return {*}
+ */
 static float zupt_calculate_mean(float *window, int size)
 {
     float sum = 0.0;
@@ -49,9 +58,13 @@ static float zupt_calculate_mean(float *window, int size)
     mean = sum / size;
     return mean;
 }
-/* -------------------------------------------------------------------------- */
-/*                                    计算方差                                    */
-/* -------------------------------------------------------------------------- */
+
+/**
+ * @description: 计算方差
+ * @param {float} *window
+ * @param {int} size
+ * @return {*}
+ */
 static float zupt_calculate_variance(float *window, int size)
 {
     float mean = zupt_calculate_mean(window, size);
@@ -62,15 +75,21 @@ static float zupt_calculate_variance(float *window, int size)
     variance = variance / size;
     return variance;
 }
-/* -------------------------------------------------------------------------- */
-/*                                   方差阈值检测                                   */
-/* -------------------------------------------------------------------------- */
+
+/**
+ * @description: 方差阈值检测
+ * @param {float} *window_x
+ * @param {float} *window_y
+ * @param {float} *window_z
+ * @param {int} size
+ * @return {*}
+ */
 bool check_zupt_f_window_state(float *window_x, float *window_y, float *window_z, int size)
 {
     float var_x = zupt_calculate_variance(window_x, size);
     float var_y = zupt_calculate_variance(window_y, size);
     float var_z = zupt_calculate_variance(window_z, size);
-    //printf("window_x: %f, window_y: %f,window_z: %f\n",var_x,var_y,var_z);
+    // printf("window_x: %f, window_y: %f,window_z: %f\n",var_x,var_y,var_z);
     if (var_x < ZUPT_VARIANCE_THRESHOLD && var_y < ZUPT_VARIANCE_THRESHOLD && var_z < ZUPT_VARIANCE_THRESHOLD) {
         return true;
     }
