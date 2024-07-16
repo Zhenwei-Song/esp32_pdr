@@ -432,13 +432,6 @@ void psins_static_pos_data_update(void *pvParameters)
     CVect3 db = O31;
     CVect3 eb = O31;
 #endif
-    // static double sum_att[3] = {0};
-    // static double sum_v[3] = {0};
-    // int k = 0;
-    // double ave_att[3];
-    // double ave_v[3];
-    // double tmp1[3];
-    // double tmp2[3];
 #ifdef DEBUG
     printf("check point psins_static_pos_data_update\n");
 #endif
@@ -450,31 +443,6 @@ void psins_static_pos_data_update(void *pvParameters)
             CVect3 vm = (*(CVect3 *)mpu_Data_value.Accel * glv.g0 - db) * my_TS;
             kf.Update(&wm, &vm, 1, my_TS, 5);
             AVPUartOut(kf);
-            //  if (k != 200 && k >= 100) {
-            //      for (int j = 0; j < 3; j++) {
-            //          sum_att[j] = sum_att[j] + mpu_Data_value.Gyro[j];
-            //          sum_v[j] = sum_v[j] + mpu_Data_value.Accel[j];
-            //      }
-            //      // printf("error sum Accel:(%f,%f,%f)\n", sum_v[0], sum_v[1], sum_v[2]);
-            //      // printf("error sum att:(%f,%f,%f)\n", sum_att[0], sum_att[1], sum_att[2]);
-            //      k++;
-            //  }
-            //  else {
-            //      k++;
-            //  }
-            //  if (k == 200) {
-            //      for (int j = 0; j < 3; j++) {
-            //          ave_att[j] = sum_att[j] / 100;
-            //          ave_v[j] = sum_v[j] / 100;
-            //      }
-            //      printf("warning ave Accel:(%f,%f,%f)\n", ave_v[0], ave_v[1], ave_v[2]);
-            //      printf("warning ave att:(%f,%f,%f)\n", ave_att[0], ave_att[1], ave_att[2]);
-            //  }
-            //  printf("mpu_AD_value.Accel:(%d,%d,%d)\n", mpu_AD_value.Accel[0], mpu_AD_value.Accel[1], mpu_AD_value.Accel[2]);
-            //  printf("mpu_AD_value.Gyro:(%d,%d,%d)\n", mpu_AD_value.Gyro[0], mpu_AD_value.Gyro[1], mpu_AD_value.Gyro[2]);
-            //  printf("mpu_Data_value.Accel:(%f,%f,%f)\n", mpu_Data_value.Accel[0], mpu_Data_value.Accel[1], mpu_Data_value.Accel[2]);
-            //  printf("mpu_Data_value.Gyro:(%f,%f,%f)\n\n", mpu_Data_value.Gyro[0], mpu_Data_value.Gyro[1], mpu_Data_value.Gyro[2]);
-// printf("mpu_Data_value.Mag:(%f,%f,%f)\n", mpu_Data_value.Mag[0], mpu_Data_value.Mag[1], mpu_Data_value.Mag[2]);
 #endif // PSINS_POS_ON_BOARD
 #ifdef USING_DMP
             data_updated = true;

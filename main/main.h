@@ -2,7 +2,7 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-03-11 15:46:52
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-05-24 10:28:43
+ * @LastEditTime: 2024-07-16 14:39:35
  * @FilePath: \esp32_positioning\main\main.h
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
@@ -43,6 +43,10 @@
 #define PSINS_POS_ON_BOARD // 板上更新信息
 #define PSINS_UART         // 上传给上位机数据
 
+// #define USING_PDR
+// #define USING_ZUPT
+// #difned FORCED_CONVERGENCE //强制收敛
+
 // #define USING_SFANN_SINS // 用简化的捷联惯导定位
 
 #ifdef USING_I2C
@@ -59,8 +63,8 @@
 #define LATITUDE 23.305836   // 纬度
 #define ALTITUDE 36          // 海拔
 
-#define WAIT_TIME 3000   // 秒乘1000
-#define ALIGN_TIME 10000 // 秒乘1000
+#define WAIT_TIME 3000    // 秒乘1000
+#define ALIGN_TIME 100000 // 秒乘1000
 // #define ALIGN_TIME 10000 // 秒乘1000
 #define ZERO_BIAS_CAL_TIME 7000
 /* -------------------------------------------------------------------------- */
@@ -86,16 +90,16 @@
 /*                                   ZUPT参数                                   */
 /* -------------------------------------------------------------------------- */
 #define ZUPT_F_MIN 9.0    // m/s^2
-#define ZUPT_F_MAX 11   // m/s^2
+#define ZUPT_F_MAX 11     // m/s^2
 #define ZUPT_W_THESH 0.08 // rad/s ==1.0313240312354817757823667866539 度/s
 #define ZUPT_F_WINDOW_SIZE 50
 #define ZUPT_VARIANCE_THRESHOLD 0.2
 /* -------------------------------------------------------------------------- */
 /*                                     PDR                                    */
 /* -------------------------------------------------------------------------- */
-#define PDR_STEP_LENGTH 0.6 //m
-#define PDR_STEP_K 0.43 //步长估计参数
-#endif // USING_I2C
+#define PDR_STEP_LENGTH 0.6 // m
+#define PDR_STEP_K 0.53     // 步长估计参数
+#endif                      // USING_I2C
 
 #if (A_RANGE == A_RANGE_2)
 #define A_RANGE_NUM A_RANGE_2_NUM

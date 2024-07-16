@@ -2,7 +2,16 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-03-25 15:36:20
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-05-23 19:27:59
+ * @LastEditTime: 2024-07-16 14:46:20
+ * @FilePath: \esp32_positioning\main\main.cpp
+ * @Description: 仅供学习交流使用
+ * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
+ */
+/*
+ * @Author: Zhenwei Song zhenwei.song@qq.com
+ * @Date: 2024-03-25 15:36:20
+ * @LastEditors: Zhenwei Song zhenwei.song@qq.com
+ * @LastEditTime: 2024-07-11 17:38:56
  * @FilePath: \esp32_positioning\main\main.cpp
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
@@ -153,12 +162,15 @@ extern "C" void app_main(void)
     CVect3 w_temp = O31;
     CVect3 wm = O31;
     CVect3 vm = O31;
+
+    CVect3 my_att = O31;
+
     float temp_gyro_bias[3] = {0};
     float temp_acc_bias[3] = {0};
 
     double yaw0 = C360CC180(0 * glv.deg); // 北偏东为正
     CVect3 pos0 = LLH(LATITUDE, LONGITUDE, ALTITUDE);
-    CAligni0 align(pos0);
+    CAligni0 align(pos0, O31, 0); // 静态对准
     CKFApp kf(my_TS);
 
     bool zupt_f_flag = false;
@@ -217,7 +229,7 @@ extern "C" void app_main(void)
                         printf("temp_acc_bias[%d] %f \n", i, temp_acc_bias[i]);
                     }
                     eb = CVect3(temp_gyro_bias[0], temp_gyro_bias[1], temp_gyro_bias[2]); // 陀螺零偏 deg/s
-                    db = CVect3(temp_acc_bias[0], temp_acc_bias[1], temp_acc_bias[2]);
+                    //db = CVect3(temp_acc_bias[0], temp_acc_bias[1], temp_acc_bias[2]);
                     printf("Finish calculating bias!!\n");
                 }
             }
@@ -226,8 +238,8 @@ extern "C" void app_main(void)
                 v_temp = (*(CVect3 *)mpu_Data_value.Accel - db) * glv.g0;
                 wm = w_temp * my_TS;
                 vm = v_temp * my_TS;
-                // CVect3 vm = (*(CVect3 *)mpu_Data_value.Accel * glv.g0) * my_TS;
-#if 0
+                //  CVect3 vm = (*(CVect3 *)mpu_Data_value.Accel * glv.g0) * my_TS;
+#if defined USING_ZUPT
                 /* -------------------------------------------------------------------------- */
                 /*                                    ZUPT                                    */
                 /* -------------------------------------------------------------------------- */
@@ -258,7 +270,7 @@ extern "C" void app_main(void)
                     }
                 }
 
-                                if (align_ok == false) // 静态校准
+                if (align_ok == false) // 静态校准
                 {
                     align.Update(&wm, &vm, 1, my_TS, O31);
                     if (OUT_cnt > (ALIGN_TIME + ZERO_BIAS_CAL_TIME + WAIT_TIME)) {
@@ -273,7 +285,7 @@ extern "C" void app_main(void)
                     AVPUartOut(kf);
                 }
 
-#else
+#elif defined USING_PDR
                 /* -------------------------------------------------------------------------- */
                 /*                                     PDR                                    */
                 /* -------------------------------------------------------------------------- */
@@ -313,8 +325,12 @@ extern "C" void app_main(void)
                     if (pdr_filtered_signal > 0.55 && vm.k < 0.2) {
                         pdr_current_step_time = OUT_cnt;
                         if (pdr_current_step_time - pdr_last_step_time > 450) { // 0.45s
+
                             // printf("sinal before: %f, pdr_filtered:%f\n", pdr_f_final, pdr_filtered_signal);
                             // kf.SetMeasGNSS(O31, CVect3(0, 0, 0.00001));
+
+#if 1 // 使用步长估计
+
                             if (pdr_error_jump >= 2) { // 开机后会误测两次
                                 if (pdr_after_first_step == false) {
                                     pdr_length_e = PDR_STEP_LENGTH * sin(CC180C360(kf.sins.att.k)); // 应该先进性kf.Update更新姿态角
@@ -334,6 +350,13 @@ extern "C" void app_main(void)
                             else {
                                 pdr_error_jump = pdr_error_jump + 1;
                             }
+#else  // 仅使用固定步长
+                            pdr_length_e = PDR_STEP_LENGTH * sin(CC180C360(kf.sins.att.k)); // 应该先进性kf.Update更新姿态角
+                            pdr_length_n = PDR_STEP_LENGTH * cos(CC180C360(kf.sins.att.k)); // 应该先进性kf.Update更新姿态角
+                            pdr_length[0] = pdr_length_e;
+                            pdr_length[1] = pdr_length_n;
+#endif // 使用步长估计
+
                             // printf("yaw: %f\n", CC180C360(kf.sins.att.k) / DEG);
                             // printf("pdr_length_n: %f, pdr_length_e:%f\n", pdr_length_n, pdr_length_e);
                             printf("pdr start!\n");
@@ -343,22 +366,26 @@ extern "C" void app_main(void)
                     AVPUartOut(kf);
                     pdr_length_e = pdr_length_n = 0;
                 }
-#endif
 
-                // if (align_ok == false) // 静态校准
-                // {
-                //     align.Update(&wm, &vm, 1, my_TS, O31);
-                //     if (OUT_cnt > (ALIGN_TIME + ZERO_BIAS_CAL_TIME + WAIT_TIME)) {
-                //         align_ok = true;
-                //         kf.Init(CSINS(a2qua(CVect3(0, 0, yaw0)), O31, pos0)); // 请正确初始化方位和位置
-                //         printf("Finish Aligning!!\n");
-                //     }
-                // }
-                // else // 后续更新
-                // {
-                //     kf.Update(&wm, &vm, 1, my_TS, 1);
-                //     AVPUartOut(kf);
-                // }
+#else // 纯惯导
+                if (align_ok == false) // 静态校准
+                {
+                    align.Update(&wm, &vm, 1, my_TS, O31);
+                    my_att = q2att(align.qnb); // 获取对准结束后的姿态阵（四元数）
+                    if (OUT_cnt > (ALIGN_TIME + ZERO_BIAS_CAL_TIME + WAIT_TIME)) {
+                        align_ok = true;
+                        // kf.Init(CSINS(a2qua(CVect3(0, 0, yaw0)), O31, pos0)); // 请正确初始化方位和位置
+                        kf.Init(CSINS(my_att, O31, pos0)); // 请正确初始化方位和位置
+                        printf("Finish Aligning 1!!\n");
+                    }
+                }
+                else // 后续更新
+                {
+                    kf.Update(&wm, &vm, 1, my_TS, 1);
+                    AVPUartOut(kf);
+                }
+
+#endif
             }
 
 #ifdef USING_DMP

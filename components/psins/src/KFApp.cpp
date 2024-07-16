@@ -45,7 +45,7 @@ void CKFApp::Init(const CSINS &sins0, int grade)
     Rmin = Rt * 0.01;
     Rb = 0.06;                                      // 调小使得滤波器更敏感，反应更快
     FBTau.Set(fXX9(0.005), fXX6(0.01), fINF3, INF); // 减小反馈时间常数，使响应更快
-#else //更激进
+#else                                               // 更激进
     CSINSGNSS::Init(sins0);
     Pmax.Set2(fPHI(600, 600), fXXX(500), fdPOS(1e6), fDPH3(5000), fMG3(10), fXXX(10), 0.1);
     Pmin.Set2(fPHI(0.1, 1.0), fXXX(0.001), fdPOS(0.1), fDPH3(0.1), fUG3(10), fXXX(0.01), 0.0001);
@@ -68,7 +68,22 @@ void AVPUartOut(const CKFApp &kf)
 
 void AVPUartOut(const CVect3 &att, const CVect3 &vn, const CVect3 &pos)
 {
-#if 1
+#ifdef FORCED_CONVERGENCE
+    /* -------------------------------------------------------------------------- */
+    /*                                   FORCED_CONVERGENCE                       */
+    /* -------------------------------------------------------------------------- */
+    out_data.Att[0] = temp_out_data[8];
+    out_data.Att[1] = temp_out_data[9];
+    out_data.Att[2] = temp_out_data[10];
+    out_data.Vn[0] = temp_out_data[0];
+    out_data.Vn[1] = temp_out_data[1];
+    out_data.Vn[2] = temp_out_data[2];
+    out_data.Pos[0] = temp_out_data[3];
+    out_data.Pos[1] = temp_out_data[4];
+    out_data.Pos[2] = temp_out_data[5];
+    out_data.Pos[3] = temp_out_data[6];
+    out_data.Pos[4] = temp_out_data[7];
+#else
     /* -------------------------------------------------------------------------- */
     /*                                    卡尔曼滤波                                   */
     /* -------------------------------------------------------------------------- */
@@ -87,21 +102,6 @@ void AVPUartOut(const CVect3 &att, const CVect3 &vn, const CVect3 &pos)
     out_data.Pos[2] = deg;
     out_data.Pos[3] = pos.i / DEG - deg;
     out_data.Pos[4] = pos.k;
-#else
-    /* -------------------------------------------------------------------------- */
-    /*                                    sins                                    */
-    /* -------------------------------------------------------------------------- */
-    out_data.Att[0] = temp_out_data[8];
-    out_data.Att[1] = temp_out_data[9];
-    out_data.Att[2] = temp_out_data[10];
-    out_data.Vn[0] = temp_out_data[0];
-    out_data.Vn[1] = temp_out_data[1];
-    out_data.Vn[2] = temp_out_data[2];
-    out_data.Pos[0] = temp_out_data[3];
-    out_data.Pos[1] = temp_out_data[4];
-    out_data.Pos[2] = temp_out_data[5];
-    out_data.Pos[3] = temp_out_data[6];
-    out_data.Pos[4] = temp_out_data[7];
 #endif
     // printf("out accel: %f,%f,%f\n", out_data.Accel[0], out_data.Accel[1], out_data.Accel[2]);
     // printf("out Gyro: %f,%f,%f\n", out_data.Gyro[0], out_data.Gyro[1], out_data.Gyro[2]);

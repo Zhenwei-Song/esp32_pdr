@@ -9,6 +9,8 @@ Date: 17/02/2015, 19/07/2017, 11/12/2018, 27/12/2019, 12/12/2020, 22/11/2021, 17
 #ifndef _PSINS_H
 #define _PSINS_H
 
+#include "./../../../main/main.h"
+
 #include <float.h>
 #include <math.h>
 #include <stdio.h>
@@ -25,7 +27,7 @@ extern float pdr_length[3];
 
 /************** compiling control !!! ***************/
 //#define PSINS_MATRIX_MAX_DIM	46
-#define PSINS_MATRIX_MAX_DIM	19
+#define PSINS_MATRIX_MAX_DIM	28
 //#define PSINS_IO_FILE
 //#define PSINS_IO_FILE_FIND
 //#define PSINS_RMEMORY

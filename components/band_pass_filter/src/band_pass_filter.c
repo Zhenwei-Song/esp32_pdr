@@ -2,8 +2,8 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-05-24 10:23:13
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-05-24 10:57:19
- * @FilePath: \esp32_positioning\components\shift_window\src\shift_window.c
+ * @LastEditTime: 2024-05-31 15:53:48
+ * @FilePath: \esp32_positioning\components\band_pass_filter\src\band_pass_filter.c
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
  */
@@ -14,9 +14,9 @@
 
 #define PI 3.14159265358979323846
 
- /* -------------------------------------------------------------------------- */
- /*                                 初始化带通滤波器参数                                 */
- /* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                 初始化带通滤波器参数                                 */
+/* -------------------------------------------------------------------------- */
 void init_band_pass_filter(band_pass_filter_s *filter, double center_freq, double bandwidth, double sample_rate)
 {
     double omega = 2 * PI * center_freq / sample_rate;
@@ -37,6 +37,7 @@ void init_band_pass_filter(band_pass_filter_s *filter, double center_freq, doubl
 /* -------------------------------------------------------------------------- */
 /*                                 带通滤波器处理函数                                */
 /* -------------------------------------------------------------------------- */
+
 static float process_band_pass_filter(band_pass_filter_s *filter, float input)
 {
     float output = filter->a0 * input + filter->a1 * filter->x1 + filter->a2 * filter->x2 - filter->b1 * filter->y1 - filter->b2 * filter->y2;
@@ -53,7 +54,7 @@ static float process_band_pass_filter(band_pass_filter_s *filter, float input)
 /* -------------------------------------------------------------------------- */
 /*                                  步数检测信号处理                                  */
 /* -------------------------------------------------------------------------- */
-float process_step_detection(float input_signal,band_pass_filter_s *filter)
+float process_step_detection(float input_signal, band_pass_filter_s *filter)
 {
     float output_signal = 0;
     // for (int i = 0; i < length; i++) {

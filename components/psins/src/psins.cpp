@@ -8,11 +8,17 @@ Date: 17/02/2015, 19/07/2017, 11/12/2018, 27/12/2019, 12/12/2020, 22/11/2021, 17
 
 #include "./../inc/psins.h"
 
+#ifdef FORCED_CONVERGENCE
 #define VN_PROP 0.9993
-// #define VN_PROP 1
 #define V0_PROP (1 - VN_PROP)
 #define AN_PROP (1 / VN_PROP)
 // #define AN_PROP 1
+#else
+#define VN_PROP 1
+#define V0_PROP (1 - VN_PROP)
+#define AN_PROP (1 / VN_PROP)
+#endif
+
 
 float temp_out_data[11];
 static CVect3 temp_v0;
@@ -6301,16 +6307,13 @@ void CSINS::Update(const CVect3 *pwm, const CVect3 *pvm, int nSamples, double ts
         an = fn + eth.gcc;
         anbar = (1 - afabar) * anbar + afabar * an;
         // printf("csins update check\n");
-#if 0 // 原本
-        CVect3 vn1 = V0_PROP * temp_v0 + VN_PROP * vn + an * nts;
-        pos = pos + eth.vn2dpos(vn + vn1, nts2);
-        vn = vn1;
-#elif 1//PDR
+
+#if defined USING_PDR
         CVect3 pdr_len = CVect3(pdr_length[0], pdr_length[1], pdr_length[2]);
         pos = pos + eth.pdr2dpos(pdr_len);
-        pdr_length[0] = pdr_length[1] = pdr_length[2] =0;
-#else // zupt尝试
-      // CVect3 vn1 = O31;
+        pdr_length[0] = pdr_length[1] = pdr_length[2] = 0;
+#elif defined USING_ZUPT
+        // CVect3 vn1 = O31;
         if (zupt_final_flag == true) {
             zupt_final_flag = false;
             CVect3 vn1 = temp_v0 / V0_PROP;
@@ -6323,7 +6326,12 @@ void CSINS::Update(const CVect3 *pwm, const CVect3 *pvm, int nSamples, double ts
             pos = pos + eth.vn2dpos(vn + vn1, nts2);
             vn = vn1;
         }
+#else //原始
+        CVect3 vn1 = V0_PROP * temp_v0 + VN_PROP * vn + an * nts;
+        pos = pos + eth.vn2dpos(vn + vn1, nts2);
+        vn = vn1;
 #endif
+
         // pos = pos + eth.vn2dpos(vn + vn1, nts2);
         // vn = vn1;
         qnb = qnb * rv2q(imu.phim);
@@ -6475,6 +6483,7 @@ void CSINS::Update(const CVect3 *pwm, const CVect3 *pvm, int nSamples, double ts
     mmfb.Update((float)(norm(imu.vmm) * _nts + eth.gn.k));
     // printf("CSINS UPDATE\n");
 
+#ifdef FORCED_CONVERGENCE
     temp_out_data[0] = vn.i;
     temp_out_data[1] = vn.j;
     temp_out_data[2] = vn.k;
@@ -6490,6 +6499,7 @@ void CSINS::Update(const CVect3 *pwm, const CVect3 *pvm, int nSamples, double ts
     temp_out_data[8] = att.i / DEG;
     temp_out_data[9] = att.j / DEG;
     temp_out_data[10] = CC180C360(att.k) / DEG;
+    #endif
 }
 
 void CSINS::Extrap(const CVect3 &wm, const CVect3 &vm, double ts)
