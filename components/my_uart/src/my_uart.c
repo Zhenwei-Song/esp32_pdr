@@ -2,7 +2,7 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-03-26 16:11:33
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-04-12 16:12:45
+ * @LastEditTime: 2024-07-17 16:41:48
  * @FilePath: \esp32_positioning\components\my_uart\src\my_uart.c
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
@@ -27,6 +27,7 @@ void psins_uart_init(void)
     ESP_ERROR_CHECK(uart_param_config(UART_NUM_1, &uart_config));
     // 设置串口引脚号 串口编号、tx引脚、rx引脚、rts引脚、cts引脚
     ESP_ERROR_CHECK(uart_set_pin(UART_NUM_1, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+
 }
 
 int psins_sendData_tx(const char *logName, const char *data, int len)

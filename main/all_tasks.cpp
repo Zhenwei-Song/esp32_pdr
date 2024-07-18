@@ -14,15 +14,7 @@
 
 #ifdef USING_RAW
 #include "./../components/mpu9250/inc/mpu9250_raw.h"
-#ifdef YAW_INIT
-#include "./../components/yaw_init_by_mag/inc/yaw_init_by_mag.h"
-#endif // YAW_INIT
 #endif // USING_RAW
-
-#ifdef USING_INS
-#include "./../components/ins/inc/data_processing.h"
-#include "./../components/ins/inc/ins.h"
-#endif // USING_INS
 
 #ifdef USING_PSINS
 #include "./../components/mpu9250/inc/mpu_dmp_driver.h"
@@ -31,15 +23,6 @@
 #include "./../components/psins/inc/uart_out.h"
 #endif
 #endif // USING_PSINS
-
-#ifdef USING_SFANN_SINS
-#include "./../components/mpu9250/inc/mpu_dmp_driver.h"
-#include "./../components/sfann_sins/inc/MyMatrix.h"
-#include "./../components/sfann_sins/inc/att2que.h"
-#include "./../components/sfann_sins/inc/my_insupdate.h"
-#include "./../components/sfann_sins/inc/que2att.h"
-#include "./../components/sfann_sins/inc/que2mat.h"
-#endif // USING_SFANN_SINS
 
 #ifdef USING_DMP
 // float magCalibration[3];
@@ -73,11 +56,7 @@ SemaphoreHandle_t xCountingSemaphore_data_update;
 #endif
 #endif // PSINS_POS
 
-#ifdef USING_SFANN_SINS
-static double wm_data[3] = {0};
-static double vm_data[3] = {0};
-SemaphoreHandle_t xCountingSemaphore_data_update;
-#endif // USING_SFANN
+static char mag_read_flag = 2;
 
 #ifdef USING_DMP
 void ins_init(void)
@@ -142,51 +121,6 @@ void get_dmp_data(void *arg)
 #endif
             }
 #endif // USING_PSINS
-
-#ifdef USING_SFANN_SINS
-            if (data_updated == true) { // 上一个数据处理完
-                data_updated = false;
-                gyro_data_ready_cb();
-                dmp_get_data(&point_got);
-                for (int i = 0; i < 3; i++) {
-                    new_point.acc[i] = point_got.acc[i];
-                    new_point.gyr[i] = point_got.gyr[i];
-                    new_point.linear_acc[i] = point_got.linear_acc[i];
-                    new_point.acc_fifo[i] = point_got.acc_fifo[i];
-                    new_point.gyr_fifo[i] = point_got.gyr_fifo[i];
-#ifdef GET_RAW_INFO
-                    new_point.acc_raw[i] = point_got.acc_raw[i];
-                    new_point.gyr_raw[i] = point_got.gyr_raw[i];
-#endif // GET_RAW_INFO
-                }
-                wm_data[0] = -new_point.gyr_fifo[0];
-                wm_data[1] = -new_point.gyr_fifo[1];
-                wm_data[2] = -new_point.gyr_fifo[2];
-                for (int i = 0; i < 3; i++) {
-                    vm_data[i] = new_point.acc_fifo[i];
-                }
-                xSemaphoreGive(xCountingSemaphore_data_update);
-            }
-#endif // USING_SFANN_SINS
-
-#ifdef USING_INS
-            new_point = *get_point(&new_point, 0.2, G);
-            printf("point get:(%.3f,%.3f,%.3f)\n\n", new_point.position[0], new_point.position[1], new_point.position[2]);
-            dmp_get_data(&point_got);
-            for (int i = 0; i < 3; i++) {
-                new_point.q[i] = point_got.q[i];
-                new_point.acc[i] = point_got.acc[i];
-                new_point.gyr[i] = point_got.gyr[i];
-                new_point.linear_acc[i] = point_got.linear_acc[i];
-            }
-            new_point.q[3] = point_got.q[3];
-            printf("new_point.speed:(%.3f,%.3f,%.3f)\n", new_point.speed[0], new_point.speed[1], new_point.speed[2]);
-            printf("new_point.q:(%.3f,%.3f,%.3f,%.3f)\n", new_point.q[0], new_point.q[1], new_point.q[2], new_point.q[3]);
-            printf("new_point.gyr:(%.3f,%.3f,%.3f)\n", new_point.gyr[0], new_point.gyr[1], new_point.gyr[2]);
-            // MPU_Get_Magnetometer(&imx, &imy, &imz);
-            // printf("MPU_Get_Magnetometer:(%d,%d,%d)\n", imx, imy, imz);
-            xSemaphoreGive(xCountingSemaphore_data_update);
-#endif // USING_INS
         }
     }
 }
@@ -295,11 +229,19 @@ void get_raw_data_i2c(void *pvParameters)
                 xSemaphoreGive(xCountingSemaphore_push_data);
                 timer3_flag = false;
             }
-#else
+#else  // DOWN_SAMPLING
             RAW_MPU_Get_Gyroscope(&raw_gyr[0], &raw_gyr[1], &raw_gyr[2]);     // 读取角速度原始数据
             RAW_MPU_Get_Accelerometer(&raw_acc[0], &raw_acc[1], &raw_acc[2]); // 读取角加速度原始数据
+
             // RAW_MPU_Get_Magnetometer(&raw_mag[0], &raw_mag[1], &raw_mag[2]);  // 读取磁力计原始数据
-            // raw_tem = RAW_MPU_Get_Temperature();
+            if (mag_read_flag % 2 == 0) {
+                RAW_MPU_Get_Magnetometer(&raw_mag[0], &raw_mag[1], &raw_mag[2]); // 读取磁力计原始数据
+                if (mag_read_flag == 200)
+                 mag_read_flag = 0; 
+            }
+            mag_read_flag = mag_read_flag + 1;
+            // printf("%d", mag_read_flag);
+            raw_tem = RAW_MPU_Get_Temperature();
             //  printf("Accx:%d,Accy:%d,Accz:%d\nGyrox:%d,Gyroy:%d,Gyroz:%d\nMagx:%d,Magy:%d,Magz:%d\n\n",
             //         raw_acc[0], raw_acc[1], raw_acc[2], raw_gyr[0], raw_gyr[1], raw_gyr[2], raw_mag[0], raw_mag[1], raw_mag[2]); // 源数据串口输出
             xSemaphoreGive(xCountingSemaphore_push_data);
@@ -322,22 +264,14 @@ void push_raw_data(void *pvParameters)
             for (int i = 0; i < 3; i++) {
                 mpu_AD_value.Accel[i] = raw_acc[i];
                 mpu_AD_value.Gyro[i] = raw_gyr[i];
-                // mpu_AD_value.Mag[i] = raw_mag[i];
-                // mpu_AD_value.Temp = raw_tem;
+                mpu_AD_value.Mag[i] = raw_mag[i];
+                mpu_AD_value.Temp = raw_tem;
                 mpu_Data_value.Accel[i] = (double)mpu_AD_value.Accel[i] / (double)A_RANGE_NUM;
-                //mpu_Data_value.Gyro[i] = (double)mpu_AD_value.Gyro[i] / (double)65.536;
+                // mpu_Data_value.Gyro[i] = (double)mpu_AD_value.Gyro[i] / (double)65.536;
                 mpu_Data_value.Gyro[i] = (double)mpu_AD_value.Gyro[i] / (double)131.072;
-                // mpu_Data_value.Mag[i] = mpu_AD_value.Mag[i] * (double)0.25 * ((double)1 + ((double)mag_sensitivity[i] - (double)128) / (double)256);
-                // mpu_Data_value.Temp = ((double)mpu_AD_value.Temp / (double)333.87) + (double)21;
+                mpu_Data_value.Mag[i] = mpu_AD_value.Mag[i] * (double)0.25 * ((double)1 + ((double)mag_sensitivity[i] - (double)128) / (double)256);
+                mpu_Data_value.Temp = ((double)mpu_AD_value.Temp / (double)333.87) + (double)21;
             }
-
-#ifdef YAW_INIT
-            for (int j = 0; j < 3; j++) {
-                imu_acc[j] = ((float)raw_acc[j]) * ACC_gPerLSB;
-                imu_mag[j] = ((float)raw_mag[j]) * mpu_Data_value.Mag[j] * MAG_uTPerLSB;
-            }
-            imuDataAvailable = 1;
-#endif // YAW_INIT
 
 #ifdef GET_ACC_WITHOUT_G
             vector3D linearAcc = {0, 0, 0};
@@ -352,13 +286,6 @@ void push_raw_data(void *pvParameters)
 #endif // GET_ACC_WITHOUT_G
 
 #endif // defined PSINS_ATT || defined PSINS_POS
-
-#ifdef USING_SFANN_SINS
-            for (int i = 0; i < 3; i++) {
-                wm_data[i] = raw_gyr[i];
-                vm_data[i] = raw_acc[i];
-            }
-#endif // USING_SFANN_SINS
        // printf("push_raw_data check\n");
             xSemaphoreGive(xCountingSemaphore_data_update);
         }
@@ -504,101 +431,6 @@ void psins_uart_pop_data(void *pvParameters)
 }
 
 #endif // PSINS_UART
-
-#ifdef USING_SFANN_SINS
-/**
- * @description: 简化版PSINS解算程序（未验证）
- * @param {void} *pvParameters
- * @return {*}
- */
-void sins_pos_data_update(void *pvParameters)
-{
-#ifdef DEBUG
-    printf("check point4\n");
-#endif
-#ifdef PSINS_UART
-    psins_uart_init();
-#endif
-    double deg2rad;
-    deg2rad = pi / 180;
-    Matrix vn, pos, qnb, wm, vm, avptq, avpt;
-    vn = Create_Matrix(3, 1);
-    pos = Create_Matrix(3, 1);
-    qnb = Create_Matrix(4, 1);
-    wm = Create_Matrix(3, 1);
-    vm = Create_Matrix(3, 1);
-    avptq = Create_Matrix(14, 1);
-    avpt = Create_Matrix(10, 1);
-    double att_data[3] = {0, 0, 90 * deg2rad};
-    double vn_data[3] = {0, 0, 0};
-    double pos_data[3] = {34 * deg2rad, 108 * deg2rad, 100};
-    double qnb_data[4] = {0};
-    double ts = 0.2, nts = 0.0;
-    double wm_data[3] = {0};
-    double vm_data[3] = {0};
-
-    qnb = att2que(att_data);
-    SetData_Matrix(vn, vn_data);
-    SetData_Matrix(pos, pos_data);
-#ifdef DEBUG
-    printf("check point9\n");
-#endif
-    while (1) {
-        if (xSemaphoreTake(xCountingSemaphore_data_update, portMAX_DELAY) == pdTRUE) {
-#ifdef DEBUG
-            printf("check point2\n");
-#endif
-            for (int i = 0; i < 3; i++) {
-                wm_data[i] = mpu_Data_value.Gyro[i] * glv.dps * my_TS;
-                vm_data[i] = mpu_Data_value.Accel[i] * glv.g0 * my_TS;
-            }
-
-            SetData_Matrix(wm, wm_data);
-            SetData_Matrix(vm, vm_data);
-            // nts = nts + ts;
-            nts = my_TS;
-            avptq = my_insupdate(qnb, vn, pos, wm, vm, nts);
-            avpt = Cope_Matrix(avptq, 10, 1);
-
-            vn_data[0] = PickInMat(avptq, 4, 1);
-            vn_data[1] = PickInMat(avptq, 5, 1);
-            vn_data[2] = PickInMat(avptq, 6, 1);
-            pos_data[0] = PickInMat(avptq, 7, 1);
-            pos_data[1] = PickInMat(avptq, 8, 1);
-            pos_data[2] = PickInMat(avptq, 9, 1);
-            qnb_data[0] = PickInMat(avptq, 11, 1);
-            qnb_data[1] = PickInMat(avptq, 12, 1);
-            qnb_data[2] = PickInMat(avptq, 13, 1);
-            qnb_data[3] = PickInMat(avptq, 14, 1);
-
-            SetData_Matrix(vn, vn_data);
-            SetData_Matrix(pos, pos_data);
-            SetData_Matrix(qnb, qnb_data);
-            // ShowWrite_Matrix(Trans_Matrix(avptq));
-            for (int i = 0; i < 3; i++) {
-                out_data.Gyro[i] = (float)mpu_Data_value.Gyro[i];
-                out_data.Accel[i] = (float)(mpu_Data_value.Accel[i] * (double)glv.g0);
-                out_data.Vn[i] = vn_data[i];
-            }
-
-            out_data.Pos[0] = pos_data[0];
-            // out_data.Pos[1] = pos.j / DEG - deg;
-            out_data.Pos[2] = pos_data[1];
-            // out_data.Pos[3] = pos.i / DEG - deg;
-            out_data.Pos[4] = pos_data[2];
-
-            Data_updata();
-            psins_sendData_tx(TX_TAG, (const char *)Usart1_out_DATA, 35 * 4);
-#if defined USING_RAW && !defined DOWN_SAMPLING
-            timer3_flag = false;
-#endif
-#ifdef USING_DMP
-            data_updated = true;
-#endif
-        }
-    }
-}
-#endif // USING_SFANN_SINS
 
 #ifdef USING_SPI
 /**

@@ -38,7 +38,9 @@ extern float pdr_length[3];
 //#define PSINS_CONSOLE_UART
 //#define PSINS_VC_AFX_HEADER
 //#define PSINS_COMPLEX
+
 #define PSINS_FAST_CALCULATION
+
 //#define PSINS_FOR_LINUX
 
 #ifdef PSINS_IO_FILE

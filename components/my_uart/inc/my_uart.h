@@ -4,6 +4,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#include "../../../main/main.h"
 
 #include "driver/gpio.h"
 #include "driver/uart.h"
@@ -17,8 +18,13 @@ extern "C" {
 
 extern int RX_BUF_SIZE;
 
+#ifdef IS_ESP32_S3
+#define TXD_PIN (GPIO_NUM_4)
+#define RXD_PIN (GPIO_NUM_5)
+#else
 #define TXD_PIN (GPIO_NUM_2)
 #define RXD_PIN (GPIO_NUM_4)
+#endif
 
 void psins_uart_init(void);
 

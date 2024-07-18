@@ -2,14 +2,14 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-02-28 18:53:28
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-03-07 15:16:03
+ * @LastEditTime: 2024-07-16 15:31:14
  * @FilePath: \esp32_positioning\components\mpu9250\inc\mpu_dmp_driver.h
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
  */
 #ifndef _MPU_DMP_DRIVER_H
 #define _MPU_DMP_DRIVER_H
-#include "./../../ins/inc/ins.h"
+
 #include "./../../../main/main.h"
 
 #include <stdint.h>
@@ -32,9 +32,6 @@ void gyro_data_ready_cb(void);
 uint8_t mpu_dmp_init(void);
 
 uint8_t MPU_Get_Magnetometer(short *mx, short *my, short *mz);
-
-// 获取数据，给外部调用
-void dmp_get_data(ps_point point);
 
 #ifdef __cplusplus
 }

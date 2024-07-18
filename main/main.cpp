@@ -1,21 +1,5 @@
 /*
  * @Author: Zhenwei Song zhenwei.song@qq.com
- * @Date: 2024-03-25 15:36:20
- * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-07-16 14:46:20
- * @FilePath: \esp32_positioning\main\main.cpp
- * @Description: 仅供学习交流使用
- * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
- */
-/*
- * @Author: Zhenwei Song zhenwei.song@qq.com
- * @Date: 2024-03-25 15:36:20
- * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-07-11 17:38:56
- * @FilePath: \esp32_positioning\main\main.cpp
- * @Description: 仅供学习交流使用
- * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
- * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-02-28 18:53:28
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
  * @LastEditTime: 2024-03-19 16:40:02
@@ -34,6 +18,8 @@
  *坐标广研院：23.305836,113.572256，59
  *添加了zupt(效果差)
  *添加了PDR(效果好)
+ *添加了地磁测量，温度测量
+ *添加了由地磁确定航向角的初始化方法
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
  */
@@ -57,28 +43,22 @@
 #include "./../components/psins/inc/mcu_init.h"
 #endif
 
-#ifdef USING_INS
-#include "./../components/ins/inc/data_processing.h"
-#include "./../components/ins/inc/ins.h"
-#endif // USING_INS
-
-#ifdef USING_PSINS
-#include "./../components/mpu9250/inc/mpu_dmp_driver.h"
-#include "./../components/psins/inc/mcu_init.h"
-#include "./../components/psins/inc/uart_out.h"
-#endif // USING_PSINS
-
-#ifdef USING_SFANN_SINS
-#include "./../components/mpu9250/inc/mpu_dmp_driver.h"
-#endif // USING_SFANN_SINS
+// #ifdef USING_PSINS
+// #include "./../components/mpu9250/inc/mpu_dmp_driver.h"
+// #include "./../components/psins/inc/uart_out.h"
+// #endif // USING_PSINS
 
 #ifdef USING_PSINS
 #include "./../components/mpu9250/inc/mpu_dmp_driver.h"
 #include "./../components/psins/inc/KFApp.h"
+#include "./../components/psins/inc/mcu_init.h"
 #ifdef PSINS_UART
 #include "./../components/psins/inc/uart_out.h"
 #include "my_uart.h"
-#endif
+#endif // PSINS_UART
+#ifdef YAW_INIT
+#include "./../components/yaw_init_by_mag/inc/calibration.h"
+#endif // YAW_INIT
 #endif // USING_PSINS
 
 #include "./../components/band_pass_filter/inc/band_pass_filter.h"
@@ -154,6 +134,8 @@ extern "C" void app_main(void)
 #if 1
     bool align_ok = false;
     bool zero_bias_cal_ok = false;
+    bool yaw_init_ok = false;
+
     int bias_count = 0;
     CVect3 db = O31;
     CVect3 eb = O31;
@@ -167,6 +149,7 @@ extern "C" void app_main(void)
 
     float temp_gyro_bias[3] = {0};
     float temp_acc_bias[3] = {0};
+    float temp_mag[3] = {0};
 
     double yaw0 = C360CC180(0 * glv.deg); // 北偏东为正
     CVect3 pos0 = LLH(LATITUDE, LONGITUDE, ALTITUDE);
@@ -214,7 +197,7 @@ extern "C" void app_main(void)
             if (zero_bias_cal_ok == false) {
                 for (int i = 0; i < 3; i++) {
                     temp_gyro_bias[i] = temp_gyro_bias[i] + mpu_Data_value.Gyro[i];
-                    // temp_acc_bias[i] = temp_acc_bias[i] + mpu_Data_value.Accel[i];
+                    temp_mag[i] = temp_mag[i] + mpu_Data_value.Mag[i];
                 }
                 temp_acc_bias[0] = temp_acc_bias[0] + mpu_Data_value.Accel[0];
                 temp_acc_bias[1] = temp_acc_bias[1] + mpu_Data_value.Accel[1];
@@ -225,11 +208,12 @@ extern "C" void app_main(void)
                     for (int i = 0; i < 3; i++) {
                         temp_gyro_bias[i] = temp_gyro_bias[i] / bias_count;
                         temp_acc_bias[i] = temp_acc_bias[i] / bias_count;
+                        temp_mag[i] = temp_mag[i] / bias_count;
                         printf("temp_gyro_bias[%d] %f\n", i, temp_gyro_bias[i]);
                         printf("temp_acc_bias[%d] %f \n", i, temp_acc_bias[i]);
                     }
                     eb = CVect3(temp_gyro_bias[0], temp_gyro_bias[1], temp_gyro_bias[2]); // 陀螺零偏 deg/s
-                    //db = CVect3(temp_acc_bias[0], temp_acc_bias[1], temp_acc_bias[2]);
+                    db = CVect3(temp_acc_bias[0], temp_acc_bias[1], temp_acc_bias[2]);
                     printf("Finish calculating bias!!\n");
                 }
             }
@@ -329,7 +313,7 @@ extern "C" void app_main(void)
                             // printf("sinal before: %f, pdr_filtered:%f\n", pdr_f_final, pdr_filtered_signal);
                             // kf.SetMeasGNSS(O31, CVect3(0, 0, 0.00001));
 
-#if 1 // 使用步长估计
+#if 1  // 使用步长估计
 
                             if (pdr_error_jump >= 2) { // 开机后会误测两次
                                 if (pdr_after_first_step == false) {
@@ -371,18 +355,41 @@ extern "C" void app_main(void)
                 if (align_ok == false) // 静态校准
                 {
                     align.Update(&wm, &vm, 1, my_TS, O31);
-                    my_att = q2att(align.qnb); // 获取对准结束后的姿态阵（四元数）
                     if (OUT_cnt > (ALIGN_TIME + ZERO_BIAS_CAL_TIME + WAIT_TIME)) {
                         align_ok = true;
-                        // kf.Init(CSINS(a2qua(CVect3(0, 0, yaw0)), O31, pos0)); // 请正确初始化方位和位置
+                        my_att = q2att(align.qnb); // 获取对准结束后的姿态阵（四元数）,不用qnb
+                        my_att.k = yaw0;
+#ifndef YAW_INIT
                         kf.Init(CSINS(my_att, O31, pos0)); // 请正确初始化方位和位置
-                        printf("Finish Aligning 1!!\n");
+#endif // YAW_INIT
+                        printf("Finish Align!!\n");
                     }
                 }
                 else // 后续更新
                 {
+#ifdef YAW_INIT
+                    if (yaw_init_ok == false) {
+                        CVect3 Mag = CVect3(temp_mag);
+                        IMURFU(&Mag, 1, "FRD");
+                        Mag = (Mag * 0.01 - b) * A;
+                        Mag = a2qua(my_att) * Mag;
+                        double yaw = atan2Ex(Mag.i, Mag.j) + yaw0;
+                        if (yaw > PI)
+                            yaw = yaw - 2 * PI;
+                        else if (yaw < -PI)
+                            yaw = yaw + 2 * PI;
+                        my_att.k = yaw;
+                        kf.Init(CSINS(my_att, O31, pos0)); // 请正确初始化方位和位置
+                        yaw_init_ok = true;
+                    }
+                    else {
+                        kf.Update(&wm, &vm, 1, my_TS, 1);
+                        AVPUartOut(kf);
+                    }
+#else  //! def YAW_INIT
                     kf.Update(&wm, &vm, 1, my_TS, 1);
                     AVPUartOut(kf);
+#endif // YAW_INIT
                 }
 
 #endif
@@ -541,116 +548,10 @@ extern "C" void app_main(void)
 #endif
         }
     }
-#else
-    float my_vm[3] = {0};
-    CMahony mahony(10.0);
-    int bias_count = 0;
-    float temp_gyro_bias[3] = {0};
-    float temp_acc_bias[3] = {0};
-    bool zero_bias_cal_ok = false;
-    CVect3 db = O31;
-    CVect3 eb = O31;
-    while (1) {
-        if (xSemaphoreTake(xCountingSemaphore_data_update, portMAX_DELAY) == pdTRUE) // 得到了信号量
-        {
-            if (zero_bias_cal_ok == false) {
-                for (int i = 0; i < 3; i++) {
-                    temp_gyro_bias[i] = temp_gyro_bias[i] + mpu_Data_value.Gyro[i];
-                    // temp_acc_bias[i] = temp_acc_bias[i] + mpu_Data_value.Accel[i];
-                }
-                temp_acc_bias[0] = temp_acc_bias[0] + mpu_Data_value.Accel[0];
-                temp_acc_bias[1] = temp_acc_bias[1] + mpu_Data_value.Accel[1];
-                temp_acc_bias[2] = temp_acc_bias[2] + (mpu_Data_value.Accel[2] - 1);
-                bias_count = bias_count + 1;
-                if (OUT_cnt > ZERO_BIAS_CAL_TIME) {
-                    zero_bias_cal_ok = true;
-                    for (int i = 0; i < 3; i++) {
-                        temp_gyro_bias[i] = temp_gyro_bias[i] / bias_count;
-                        temp_acc_bias[i] = temp_acc_bias[i] / bias_count;
-                        printf("temp_gyro_bias[%d] %f\n", i, temp_gyro_bias[i]);
-                        printf("temp_acc_bias[%d] %f \n", i, temp_acc_bias[i]);
-                    }
-                    eb = CVect3(temp_gyro_bias[0], temp_gyro_bias[1], temp_gyro_bias[2]) * glv.dps; // 陀螺零偏 deg/s
-                    // kf.Init(CSINS(a2qua(CVect3(0, 0, yaw0)), O31, pos0));                           // 请正确初始化方位和位置
-                    db = CVect3(temp_acc_bias[0], temp_acc_bias[1], temp_acc_bias[2]) * glv.g0;
-                    printf("Finish calculating bias!!\n");
-                }
-            }
-            else {
-                CVect3 wm = (*(CVect3 *)mpu_Data_value.Gyro * glv.dps - eb) * my_TS;
-                CVect3 vm = (*(CVect3 *)mpu_Data_value.Accel * glv.g0 - db) * my_TS;
-                mahony.Update(wm, vm, my_TS);
-#if 1
 
-                /* -------------------------------------------------------------------------- */
-                /*                                    带重力分量                                   */
-                /* -------------------------------------------------------------------------- */
-                my_vm[0] = (mpu_Data_value.Accel[0] * glv.g0 - temp_acc_bias[0] * glv.g0) * my_TS;
-                my_vm[1] = (mpu_Data_value.Accel[1] * glv.g0 - temp_acc_bias[1] * glv.g0) * my_TS;
-                my_vm[2] = (mpu_Data_value.Accel[2] * glv.g0 - (temp_acc_bias[2] + 1) * glv.g0) * my_TS;
-
-                /* -------------------------------------------------------------------------- */
-                /*                                 旋转矩阵去除重力分量                                 */
-                /* -------------------------------------------------------------------------- */
-                // vector3D linearAcc = {0, 0, 0};
-                // vector3D gravity = {0.0, 0.0, -(float)glv.g0};
-                // eulerAngles angles = {0, 0, 0};
-                // vector3D_G acc_result;
-
-                // linearAcc.x = mpu_Data_value.Accel[0] * glv.g0;
-                // linearAcc.y = mpu_Data_value.Accel[1] * glv.g0;
-                // linearAcc.z = mpu_Data_value.Accel[2] * glv.g0;
-                // angles.pitch = out_data.Att[0];
-                // angles.roll = out_data.Att[1];
-                // angles.yaw = out_data.Att[2];
-                // acc_result = get_acc_without_g(linearAcc, gravity, angles);
-                // my_vm[0] = (acc_result.x) * my_TS;
-                // my_vm[1] = (acc_result.y) * my_TS;
-                // my_vm[2] = (acc_result.z) * my_TS;
-                /* -------------------------------------------------------------------------- */
-                /*                               欧拉角去除重力分量（有问题）                               */
-                /* -------------------------------------------------------------------------- */
-                float temp_acc_without_g[3] = {0};
-                float temp_pitch;
-                float temp_roll;
-                temp_pitch = out_data.Att[0];
-                temp_roll = out_data.Att[1];
-
-                // temp_acc_without_g[0] = mpu_Data_value.Accel[1] - sin(temp_roll) * cos(temp_pitch);
-                // temp_acc_without_g[1] = mpu_Data_value.Accel[2] - cos(temp_roll) * cos(temp_pitch);
-                // temp_acc_without_g[2] = mpu_Data_value.Accel[0] + sin(temp_pitch);
-
-                // my_vm[0] = (temp_acc_without_g[0] * glv.g0 - temp_acc_bias[0] * glv.g0) * my_TS;
-                // my_vm[1] = (temp_acc_without_g[1] * glv.g0 - temp_acc_bias[1] * glv.g0) * my_TS;
-                // my_vm[2] = (temp_acc_without_g[2] * glv.g0 - temp_acc_bias[2] * glv.g0) * my_TS;
-                /* -------------------------------------------------------------------------- */
-                /*                                    速度更新                                    */
-                /* -------------------------------------------------------------------------- */
-                for (int i = 0; i < 3; i++) {
-                    my_v[i] = my_v[i] + my_vm[i];
-                }
-
-                // printf("my_vm: (%f,%f,%f)\n", my_vm[0], my_vm[1], my_vm[2]);
-                printf("my_v: (%f,%f,%f)\n", my_v[0], my_v[1], my_v[2]);
-#endif
-                AVPUartOut(q2att(mahony.qnb));
-            }
-#ifdef USING_DMP
-            data_updated = true;
-#endif
-#if defined USING_RAW && !defined DOWN_SAMPLING
-            timer3_flag = false;
-#endif
-        }
-    }
 #endif
 
 #endif
 
 #endif // PSINS_POS && USING_RAW
-
-#ifdef USING_SFANN_SINS
-    xCountingSemaphore_data_update = xSemaphoreCreateCounting(200, 0);
-    xTaskCreate(sins_pos_data_update, "sins_pos_data_update", 4096, NULL, 4, NULL);
-#endif // USING_SFANN_SINS
 }

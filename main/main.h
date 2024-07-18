@@ -2,7 +2,7 @@
  * @Author: Zhenwei Song zhenwei.song@qq.com
  * @Date: 2024-03-11 15:46:52
  * @LastEditors: Zhenwei Song zhenwei.song@qq.com
- * @LastEditTime: 2024-07-16 14:39:35
+ * @LastEditTime: 2024-07-18 14:32:01
  * @FilePath: \esp32_positioning\main\main.h
  * @Description: 仅供学习交流使用
  * Copyright (c) 2024 by Zhenwei Song, All Rights Reserved.
@@ -14,6 +14,8 @@
 #include "./../components/psins/inc/mcu_init.h"
 
 // #define DEBUG
+
+#define IS_ESP32_S3
 
 /* -------------------------------------------------------------------------- */
 /*                                  数据读取方式设定                                  */
@@ -47,30 +49,36 @@
 // #define USING_ZUPT
 // #difned FORCED_CONVERGENCE //强制收敛
 
-// #define USING_SFANN_SINS // 用简化的捷联惯导定位
-
 #ifdef USING_I2C
 
 #define GET_RAW_INFO // 从寄存器直接获取角速度和加速度（和SPI一样）
-#define I2C_SCL 22
+
+#ifdef IS_ESP32_S3
+#define I2C_SDA 11
+#define I2C_SCL 12
+#define GPIO_INTR 13
+#else
 #define I2C_SDA 21
+#define I2C_SCL 22
 #define GPIO_INTR 23
+#endif
+
 #define DEFAULT_HZ (1000)   // 设置MPU9250的采样率
 #define G_RANGE G_RANGE_250 // 传感器角速度量程
 #define A_RANGE A_RANGE_2   // 传感器加速度量程
 
-#define LONGITUDE 113.572256 // 经度
-#define LATITUDE 23.305836   // 纬度
-#define ALTITUDE 36          // 海拔
+#define LONGITUDE 108.91860023655954 // 经度
+#define LATITUDE 34.2339893101992    // 纬度
+#define ALTITUDE 430                 // 海拔
 
-#define WAIT_TIME 3000    // 秒乘1000
-#define ALIGN_TIME 100000 // 秒乘1000
+#define WAIT_TIME 3000      // 秒乘1000
+#define ALIGN_TIME 300 - 00 // 秒乘1000
 // #define ALIGN_TIME 10000 // 秒乘1000
-#define ZERO_BIAS_CAL_TIME 7000
+#define ZERO_BIAS_CAL_TIME 5000
 /* -------------------------------------------------------------------------- */
 /*                                  降采样速率相关设置                                 */
 /* -------------------------------------------------------------------------- */
-#define SAMPLE_RATE (200)
+#define SAMPLE_RATE (220)
 #define MAG_SAMPLE_RATE 200
 #define MAG_SAMPLE_FACTOR (SAMPLE_RATE / MAG_SAMPLE_RATE)
 
@@ -115,18 +123,11 @@
 #define USING_PSINS
 #endif
 
-#if !defined USING_PSINS && !defined USING_INS && !defined USING_SFANN_SINS
-#define USING_INS
-#endif
 /* -------------------------------------------------------------------------- */
 /*                                   编译警示信息                                   */
 /* -------------------------------------------------------------------------- */
 #ifdef USING_SPI
 #warning Using spi!!!!!!
-#endif
-
-#ifdef USING_INS
-#warning Using ins!!!!!!
 #endif
 
 #ifdef USING_RAW
@@ -137,10 +138,6 @@
 /* -------------------------------------------------------------------------- */
 #if defined USING_I2C && defined USING_SPI
 #error "Can't use I2C and SPI at the same time!"
-#endif
-
-#if defined USING_PSINS && defined USING_INS
-#error "Can't use PSIN and INS at the same time!"
 #endif
 
 #if defined USING_RAW && defined USING_DMP

@@ -58,8 +58,8 @@ void my_spi_init(void)
         .queue_size = 20, // 传输队列大小，决定了等待传输数据的数量
     };
     // Initialize the SPI bus
-    // ret = spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO);
-    ret = spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH1);
+     ret = spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO);
+    //ret = spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH1);
     ESP_ERROR_CHECK(ret);
     // Attach the LCD to the SPI bus
     ret = spi_bus_add_device(SPI2_HOST, &devcfg, &my_spi);
